@@ -1,9 +1,10 @@
 """
 Agent Engine Memory Bank Module
-Provides durable cross-session memory for agent spend patterns, baseline models, and velocity calculations.
+Provides durable cross-session memory for agent spend patterns, baseline models,
+short-window burst density tracking, and adaptive Exponential Moving Average (EMA) velocity calculations.
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timezone, timedelta
 import math
 from src.protocols.ap2_schema import AP2PaymentMandate, AP2AgentIdentity
@@ -39,7 +40,7 @@ class AgentSpendProfile:
             "historical_mandates_count": self.historical_mandates_count,
             "total_settled_usdc": self.total_settled_usdc,
             "reputation_score": self.reputation_score,
-            "recent_transactions": self.recent_transactions[-20:]
+            "recent_transactions": self.recent_transactions[-30:]
         }
 
     @classmethod
@@ -81,17 +82,35 @@ class MemoryBank:
             firestore_client.save_agent_profile(identity.agent_id, profile.to_dict())
         return self.profiles[identity.agent_id]
 
-    def record_settled_mandate(self, mandate: AP2PaymentMandate, tx_hash: Optional[str] = None):
+    def record_mandate_attempt(self, mandate: AP2PaymentMandate):
+        """Records an attempted/evaluated mandate into the sliding activity window."""
         profile = self.get_or_create_profile(mandate.buyer_agent)
-        profile.historical_mandates_count += 1
-        profile.total_settled_usdc += mandate.total_amount_usdc
         profile.recent_transactions.append({
             "mandate_id": mandate.mandate_id,
             "amount_usdc": mandate.total_amount_usdc,
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "tx_hash": tx_hash
+            "tx_hash": None
         })
-        # Keep sliding window of recent transactions
+        profile.recent_transactions = profile.recent_transactions[-50:]
+
+    def record_settled_mandate(self, mandate: AP2PaymentMandate, tx_hash: Optional[str] = None):
+        profile = self.get_or_create_profile(mandate.buyer_agent)
+        profile.historical_mandates_count += 1
+        profile.total_settled_usdc += mandate.total_amount_usdc
+        # Update existing record with tx_hash if present
+        updated = False
+        for tx in reversed(profile.recent_transactions):
+            if tx.get("mandate_id") == mandate.mandate_id:
+                tx["tx_hash"] = tx_hash
+                updated = True
+                break
+        if not updated:
+            profile.recent_transactions.append({
+                "mandate_id": mandate.mandate_id,
+                "amount_usdc": mandate.total_amount_usdc,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "tx_hash": tx_hash
+            })
         profile.recent_transactions = profile.recent_transactions[-50:]
         firestore_client.save_agent_profile(profile.agent_id, profile.to_dict())
 
@@ -113,6 +132,95 @@ class MemoryBank:
                 continue
                 
         return spent_last_hour + new_mandate_amount
+
+    def calculate_short_window_burst_density(
+        self,
+        agent_id: str,
+        window_seconds: int = 300,
+        new_mandate_amount: float = 0.0
+    ) -> Tuple[int, float]:
+        """
+        Calculates transaction frequency and cumulative amount over a tight short window (e.g. 5 minutes)
+        to identify adversarial 'smurfing' or rapid sub-threshold probing loops.
+        """
+        profile = self.profiles.get(agent_id)
+        if not profile or not profile.recent_transactions:
+            return 1, new_mandate_amount
+
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(seconds=window_seconds)
+
+        tx_count = 0
+        tx_sum = 0.0
+        for tx in profile.recent_transactions:
+            try:
+                tx_time = datetime.fromisoformat(tx["timestamp"])
+                if tx_time >= cutoff:
+                    tx_count += 1
+                    tx_sum += float(tx.get("amount_usdc", 0.0))
+            except Exception:
+                continue
+
+        return tx_count + 1, tx_sum + new_mandate_amount
+
+    def calculate_adaptive_ema_velocity(
+        self,
+        agent_id: str,
+        alpha: float = 0.25,
+        half_life_seconds: int = 1800
+    ) -> Tuple[float, float]:
+        """
+        Adaptive Forecaster Baseline: Computes Exponential Moving Average (EMA) of hourly velocity
+        with time-decay weighting across historical observations.
+        Returns: (adaptive_ema_baseline, variance_sigma)
+        """
+        profile = self.profiles.get(agent_id)
+        if not profile or len(profile.recent_transactions) < 2:
+            base = profile.baseline_hourly_velocity if profile else 20.0
+            return base, max(base * 0.2, 2.0)
+
+        now = datetime.now(timezone.utc)
+        decay_constant = math.log(2.0) / max(half_life_seconds, 60.0)
+
+        weighted_velocities = []
+        weights = []
+
+        # Analyze transaction intervals to compute instantaneous velocity samples
+        txs = profile.recent_transactions[-20:]
+        for i in range(1, len(txs)):
+            try:
+                t_prev = datetime.fromisoformat(txs[i-1]["timestamp"])
+                t_curr = datetime.fromisoformat(txs[i]["timestamp"])
+                delta_sec = max((t_curr - t_prev).total_seconds(), 1.0)
+                amount = float(txs[i].get("amount_usdc", 0.0))
+                
+                # Project instantaneous velocity to hourly scale
+                inst_hourly_vel = (amount / delta_sec) * 3600.0
+                
+                # Time decay from current time
+                age_sec = max((now - t_curr).total_seconds(), 0.0)
+                weight = math.exp(-decay_constant * age_sec)
+                
+                weighted_velocities.append(inst_hourly_vel)
+                weights.append(weight)
+            except Exception:
+                continue
+
+        if not weights or sum(weights) == 0:
+            return profile.baseline_hourly_velocity, max(profile.baseline_hourly_velocity * 0.2, 2.0)
+
+        # Weighted Mean (EMA)
+        total_weight = sum(weights)
+        ema_mean = sum(v * w for v, w in zip(weighted_velocities, weights)) / total_weight
+        
+        # Smooth with prior static baseline
+        adaptive_baseline = (alpha * ema_mean) + ((1.0 - alpha) * profile.baseline_hourly_velocity)
+        
+        # Weighted Standard Deviation
+        variance = sum(w * ((v - ema_mean) ** 2) for v, w in zip(weighted_velocities, weights)) / total_weight
+        sigma = math.sqrt(max(variance, 1.0))
+
+        return round(adaptive_baseline, 2), round(sigma, 2)
 
 
 memory_bank = MemoryBank()

@@ -47,6 +47,10 @@ class RootOrchestrator:
                 "incident": None
             }
 
+        # Record attempt into active memory window for short-horizon burst tracking
+        from src.storage.memory_bank import memory_bank
+        memory_bank.record_mandate_attempt(mandate)
+
         # Step 2: Forecaster Evaluation (with Resilience & Recovery wrapper)
         if simulate_forecaster_failure:
             def broken_forecaster(m):

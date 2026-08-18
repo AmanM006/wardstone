@@ -1,6 +1,6 @@
 """
 Seed Agent Personas for Wardstone AP2 Memory Bank
-Creates 3 realistic agent personas with distinct spending baselines and transaction histories.
+Creates 5 realistic agent personas including normal workers, coordinators, and adversarial smurfing probes.
 """
 
 import os
@@ -32,7 +32,6 @@ def seed():
         total_settled_usdc=210.0,
         reputation_score=98.5
     )
-    # Add historical small transactions
     for i in range(10):
         p1.recent_transactions.append({
             "mandate_id": f"mandate_steady_{i}",
@@ -65,8 +64,22 @@ def seed():
     memory_bank.profiles[p2.agent_id] = p2
     print(f"  [SEED] 2. {p2.agent_name} ({p2.agent_id}): Baseline Velocity = ${p2.baseline_hourly_velocity}/hr, Max Single = ${p2.max_single_mandate}")
 
-    # 3. Compromised Runaway Agent
+    # 3. Sub-Agent Dispatcher
     p3 = AgentSpendProfile(
+        agent_id="agent_subagent_coordinator",
+        agent_name="Distributed Task Dispatcher",
+        baseline_hourly_velocity=30.0,
+        max_single_mandate=40.0,
+        historical_mandates_count=24,
+        total_settled_usdc=320.0,
+        reputation_score=96.0
+    )
+    firestore_client.save_agent_profile(p3.agent_id, p3.to_dict())
+    memory_bank.profiles[p3.agent_id] = p3
+    print(f"  [SEED] 3. {p3.agent_name} ({p3.agent_id}): Baseline Velocity = ${p3.baseline_hourly_velocity}/hr, Max Single = ${p3.max_single_mandate}")
+
+    # 4. Compromised Runaway Agent
+    p4 = AgentSpendProfile(
         agent_id="agent_compromised_runaway",
         agent_name="Unsupervised Lead Scraper (Compromised)",
         baseline_hourly_velocity=5.0,
@@ -75,17 +88,31 @@ def seed():
         total_settled_usdc=18.0,
         reputation_score=62.0
     )
-    p3.recent_transactions.append({
+    p4.recent_transactions.append({
         "mandate_id": "mandate_rogue_0",
         "amount_usdc": 2.5,
         "timestamp": (now - timedelta(minutes=45)).isoformat(),
         "tx_hash": "0xrogue0abcdef1234567890"
     })
-    firestore_client.save_agent_profile(p3.agent_id, p3.to_dict())
-    memory_bank.profiles[p3.agent_id] = p3
-    print(f"  [SEED] 3. {p3.agent_name} ({p3.agent_id}): Baseline Velocity = ${p3.baseline_hourly_velocity}/hr, Max Single = ${p3.max_single_mandate}")
+    firestore_client.save_agent_profile(p4.agent_id, p4.to_dict())
+    memory_bank.profiles[p4.agent_id] = p4
+    print(f"  [SEED] 4. {p4.agent_name} ({p4.agent_id}): Baseline Velocity = ${p4.baseline_hourly_velocity}/hr, Max Single = ${p4.max_single_mandate}")
 
-    print("\n[SUCCESS] Memory Bank successfully seeded with 3 active agent profiles.\n")
+    # 5. Adversarial Red-Team Smurfing Prober
+    p5 = AgentSpendProfile(
+        agent_id="agent_adversarial_prober",
+        agent_name="Adversarial Sub-Threshold Smurf (Red Team)",
+        baseline_hourly_velocity=8.0,
+        max_single_mandate=10.0,
+        historical_mandates_count=12,
+        total_settled_usdc=64.0,
+        reputation_score=88.0
+    )
+    firestore_client.save_agent_profile(p5.agent_id, p5.to_dict())
+    memory_bank.profiles[p5.agent_id] = p5
+    print(f"  [SEED] 5. {p5.agent_name} ({p5.agent_id}): Baseline Velocity = ${p5.baseline_hourly_velocity}/hr, Max Single = ${p5.max_single_mandate} [ADVERSARIAL PROBE]")
+
+    print("\n[SUCCESS] Memory Bank successfully seeded with 5 active agent profiles.\n")
 
 
 if __name__ == "__main__":
