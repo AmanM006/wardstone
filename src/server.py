@@ -1,0 +1,220 @@
+"""
+Wardstone AP2 FastAPI Application Server
+Provides REST and A2A RPC endpoints, serves the Command Console dashboard,
+and powers live event simulation for the AI Agent Fleet Controller.
+"""
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Dict, Any, List, Optional
+import os
+import json
+from datetime import datetime, timezone, timedelta
+
+from src.config import settings
+from src.protocols.ap2_schema import AP2PaymentMandate, AP2AgentIdentity, AP2CartItem
+from src.protocols.x402_settler import x402_settler
+from src.agents.gatekeeper import gatekeeper_agent
+from src.orchestrator.root_orchestrator import root_orchestrator
+from src.storage.firestore_client import firestore_client
+from src.storage.memory_bank import memory_bank
+from scripts.seed_agent_personas import seed
+
+
+app = FastAPI(
+    title="Wardstone AP2 — Autonomous Agent Governance & Circuit Breaker",
+    version="1.0.1",
+    description="Multi-Agent Governance Platform for AP2/x402 Micropayments on Google Cloud and Base Sepolia."
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+DASHBOARD_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "dashboard"))
+
+# Auto-seed personas on startup if empty
+@app.on_event("startup")
+async def startup_event():
+    seed()
+    print("[WardstoneServer] Server ready. Dashboard available at http://localhost:8080")
+
+
+# Mount static dashboard files
+if os.path.exists(DASHBOARD_DIR):
+    app.mount("/static", StaticFiles(directory=DASHBOARD_DIR), name="static")
+
+
+@app.get("/", response_class=HTMLResponse)
+async def serve_dashboard():
+    index_path = os.path.join(DASHBOARD_DIR, "index.html")
+    if os.path.exists(index_path):
+        with open(index_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse("<h1>Wardstone AP2 Server Running. Dashboard file initializing...</h1>")
+
+
+@app.get("/api/v1/health")
+async def health_check():
+    conn = x402_settler.check_connection()
+    return {
+        "status": "HEALTHY",
+        "service": "wardstone-ap2-circuit-breaker",
+        "version": "1.0.1",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "google_cloud_project": settings.google_cloud_project,
+        "base_sepolia": conn
+    }
+
+
+@app.get("/api/v1/agents")
+async def get_agents():
+    profiles = memory_bank.profiles
+    return {
+        "count": len(profiles),
+        "agents": [p.to_dict() for p in profiles.values()]
+    }
+
+
+@app.get("/api/v1/mandates")
+async def get_mandates(limit: int = 50):
+    mandates = firestore_client.list_mandates(limit=limit)
+    return {
+        "count": len(mandates),
+        "mandates": mandates
+    }
+
+
+@app.get("/api/v1/incidents")
+async def get_incidents(limit: int = 50):
+    incidents = firestore_client.list_incidents(limit=limit)
+    return {
+        "count": len(incidents),
+        "incidents": incidents
+    }
+
+
+@app.get("/api/v1/a2a/agent-card")
+async def get_a2a_agent_card():
+    card_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "protocols", "a2a_agent_card.json"))
+    if os.path.exists(card_path):
+        with open(card_path, "r", encoding="utf-8") as f:
+            return JSONResponse(content=json.load(f))
+    raise HTTPException(status_code=404, detail="A2A Agent Card not found")
+
+
+class PreClearanceRequest(BaseModel):
+    buyer_agent_id: str
+    amount_usdc: float
+    intended_service: Optional[str] = ""
+
+
+@app.post("/api/v1/a2a/pre-clearance")
+async def a2a_pre_clearance(req: PreClearanceRequest):
+    return gatekeeper_agent.query_pre_clearance(
+        buyer_agent_id=req.buyer_agent_id,
+        amount_usdc=req.amount_usdc,
+        intended_service=req.intended_service
+    )
+
+
+@app.post("/api/v1/mandates/submit")
+async def submit_mandate(payload: Dict[str, Any]):
+    try:
+        result = root_orchestrator.process_mandate_pipeline(payload)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+class SimulationRequest(BaseModel):
+    scenario: str # "normal_indexer" | "batch_compute" | "runaway_rogue" | "worker_failure"
+
+
+@app.post("/api/v1/simulate/trigger")
+async def trigger_simulation(req: SimulationRequest):
+    seller = AP2AgentIdentity(
+        agent_id="agent_gpu_node_42",
+        agent_name="Decentralized GPU Compute",
+        owner_wallet="0x28054904C99b7FE4c000F9F570b7f83C76f1F43E"
+    )
+
+    if req.scenario == "normal_indexer":
+        buyer = AP2AgentIdentity(
+            agent_id="agent_steady_worker",
+            agent_name="Autonomous Documentation Indexer",
+            owner_wallet="0x1111111111111111111111111111111111111111",
+            declared_spend_limit_usd=25.0
+        )
+        mandate = AP2PaymentMandate(
+            buyer_agent=buyer,
+            seller_agent=seller,
+            cart_items=[AP2CartItem(description="Vector embedding batch: 500 documents", unit_price_usdc=2.50, quantity=1)],
+            total_amount_usdc=2.50,
+            destination_wallet=seller.owner_wallet,
+            valid_until=datetime.now(timezone.utc) + timedelta(minutes=15)
+        )
+        return root_orchestrator.process_mandate_pipeline(mandate.model_dump(mode="json"))
+
+    elif req.scenario == "batch_compute":
+        buyer = AP2AgentIdentity(
+            agent_id="agent_batch_processor",
+            agent_name="Nightly Model Evaluation Worker",
+            owner_wallet="0x2222222222222222222222222222222222222222",
+            declared_spend_limit_usd=100.0
+        )
+        mandate = AP2PaymentMandate(
+            buyer_agent=buyer,
+            seller_agent=seller,
+            cart_items=[AP2CartItem(description="LLM Evaluation Benchmark Run #89", unit_price_usdc=25.0, quantity=1)],
+            total_amount_usdc=25.0,
+            destination_wallet=seller.owner_wallet,
+            valid_until=datetime.now(timezone.utc) + timedelta(minutes=15)
+        )
+        return root_orchestrator.process_mandate_pipeline(mandate.model_dump(mode="json"))
+
+    elif req.scenario == "runaway_rogue":
+        buyer = AP2AgentIdentity(
+            agent_id="agent_compromised_runaway",
+            agent_name="Unsupervised Lead Scraper (Compromised)",
+            owner_wallet="0x3333333333333333333333333333333333333333",
+            declared_spend_limit_usd=10.0
+        )
+        mandate = AP2PaymentMandate(
+            buyer_agent=buyer,
+            seller_agent=seller,
+            cart_items=[AP2CartItem(description="Infinite recursive data extraction loop", unit_price_usdc=220.0, quantity=1)],
+            total_amount_usdc=220.0,
+            destination_wallet=seller.owner_wallet,
+            valid_until=datetime.now(timezone.utc) + timedelta(minutes=15)
+        )
+        return root_orchestrator.process_mandate_pipeline(mandate.model_dump(mode="json"))
+
+    elif req.scenario == "worker_failure":
+        buyer = AP2AgentIdentity(
+            agent_id="agent_steady_worker",
+            agent_name="Autonomous Documentation Indexer",
+            owner_wallet="0x1111111111111111111111111111111111111111",
+            declared_spend_limit_usd=25.0
+        )
+        mandate = AP2PaymentMandate(
+            buyer_agent=buyer,
+            seller_agent=seller,
+            cart_items=[AP2CartItem(description="Test call with injected worker timeout", unit_price_usdc=10.0, quantity=1)],
+            total_amount_usdc=10.0,
+            destination_wallet=seller.owner_wallet,
+            valid_until=datetime.now(timezone.utc) + timedelta(minutes=15)
+        )
+        return root_orchestrator.process_mandate_pipeline(
+            mandate.model_dump(mode="json"),
+            simulate_forecaster_failure=True
+        )
+
+    raise HTTPException(status_code=400, detail="Unknown simulation scenario")

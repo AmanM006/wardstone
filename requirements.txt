@@ -1,0 +1,21 @@
+# Core Agent & Google Ecosystem
+google-genai>=1.0.0
+google-cloud-firestore>=2.16.0
+google-cloud-pubsub>=2.20.0
+pydantic>=2.7.0
+pydantic-settings>=2.2.0
+
+# Web3 & Blockchain (Base Sepolia / x402 Settlement)
+web3>=6.18.0
+eth-account>=0.11.0
+
+# Backend & Web Dashboard
+fastapi>=0.111.0
+uvicorn>=0.30.0
+python-dotenv>=1.0.1
+requests>=2.32.0
+
+# Telemetry & Observability
+opentelemetry-api>=1.25.0
+opentelemetry-sdk>=1.25.0
+opentelemetry-exporter-otlp>=1.25.0

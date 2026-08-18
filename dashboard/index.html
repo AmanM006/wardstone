@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wardstone AP2 — Autonomous Agent Governance & Circuit Breaker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Navigation Header -->
+    <header class="navbar">
+      <div class="nav-left">
+        <div class="brand-logo">
+          <div class="logo-shield"></div>
+          <span class="brand-title">WARDSTONE <span class="brand-sub">AP2</span></span>
+        </div>
+        <span class="role-badge">AI Agent Fleet Controller</span>
+      </div>
+      <div class="nav-right">
+        <div class="chain-status">
+          <span class="status-indicator live"></span>
+          <span class="chain-name">Base Sepolia (84532)</span>
+          <span class="block-height" id="blockHeight">Block #--</span>
+        </div>
+        <div class="gcp-badge">
+          <span class="gcp-dot"></span> Google Cloud + Gemini 3.5
+        </div>
+      </div>
+    </header>
+
+    <!-- Simulation Control Surface -->
+    <section class="simulation-banner">
+      <div class="sim-header">
+        <span class="sim-title">⚡ Live Simulation & Verification Control Surface</span>
+        <span class="sim-desc">Trigger real AP2 payment mandates and test circuit-breaker interventions live</span>
+      </div>
+      <div class="sim-buttons">
+        <button class="btn btn-safe" onclick="triggerSimulation('normal_indexer')">
+          <span class="btn-icon">🟢</span> Trigger Normal Mandate ($2.50)
+        </button>
+        <button class="btn btn-batch" onclick="triggerSimulation('batch_compute')">
+          <span class="btn-icon">🟡</span> Trigger Batch Compute ($25.00)
+        </button>
+        <button class="btn btn-danger" onclick="triggerSimulation('runaway_rogue')">
+          <span class="btn-icon">🔴</span> Simulate Rogue Runaway ($220.00)
+        </button>
+        <button class="btn btn-recovery" onclick="triggerSimulation('worker_failure')">
+          <span class="btn-icon">⚠️</span> Inject Worker Timeout & Test Recovery
+        </button>
+      </div>
+    </section>
+
+    <!-- Metrics Bar -->
+    <section class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-label">Total Fleet Spend (USDC)</div>
+        <div class="metric-val" id="metricTotalSpend">$0.00</div>
+        <div class="metric-sub">Base Sepolia On-Chain Settlement</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Monitored Agent Fleets</div>
+        <div class="metric-val" id="metricAgentCount">3 Active</div>
+        <div class="metric-sub">Agent Engine Memory Bank</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Circuit Breaker Interventions</div>
+        <div class="metric-val text-red" id="metricQuarantineCount">0</div>
+        <div class="metric-sub">Runaway Spends Quarantined</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Settlement Security Rate</div>
+        <div class="metric-val text-green" id="metricSecurityRate">100%</div>
+        <div class="metric-sub">Zero Rogue Leaks Permitted</div>
+      </div>
+    </section>
+
+    <!-- Main Workspace -->
+    <main class="main-grid">
+      <!-- Left Column: Live Mandate Stream -->
+      <section class="panel mandate-stream-panel">
+        <div class="panel-header">
+          <div class="panel-title-wrap">
+            <h2 class="panel-title">Real-Time Mandates & Governance Stream</h2>
+            <span class="panel-badge" id="mandateCountBadge">0 Mandates</span>
+          </div>
+          <button class="btn-refresh" onclick="fetchData()">↻ Refresh</button>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Mandate ID</th>
+                <th>Buyer Agent</th>
+                <th>Amount</th>
+                <th>Blast Risk</th>
+                <th>Status</th>
+                <th>On-Chain Tx</th>
+              </tr>
+            </thead>
+            <tbody id="mandateTableBody">
+              <tr>
+                <td colspan="6" class="empty-state">No mandates ingested yet. Click a simulation button above.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Right Column: Incident Postmortems & Agent Memory Bank -->
+      <div class="right-column">
+        <!-- Incident Postmortem Panel -->
+        <section class="panel incidents-panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Active Incident Postmortems (Gemini 3.5)</h2>
+            <span class="panel-badge badge-alert" id="incidentBadge">0 Incidents</span>
+          </div>
+          <div class="incidents-list" id="incidentsContainer">
+            <div class="empty-state">No active incidents. Fleet is operating within normal baseline bounds.</div>
+          </div>
+        </section>
+
+        <!-- Monitored Agent Fleet Baselines -->
+        <section class="panel memory-bank-panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Memory Bank: Agent Baseline Baselines</h2>
+            <span class="panel-badge">A2A Cards</span>
+          </div>
+          <div class="agents-list" id="agentsContainer">
+            <!-- Populated via JS -->
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="app-footer">
+      <span>Wardstone AP2 v1.0.1 • Built for Google All Things Agentic Hackathon</span>
+      <span>Base Sepolia Contract: <code>0x036CbD53842c5426634e7929541eC2318f3dCF7e</code></span>
+    </footer>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

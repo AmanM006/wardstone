@@ -1,0 +1,51 @@
+{
+  "@context": "https://schema.org/v1/a2a.jsonld",
+  "type": "A2AAgentCard",
+  "id": "urn:agent:wardstone-gatekeeper-01",
+  "name": "Wardstone Gatekeeper & Circuit Breaker",
+  "version": "1.0.1",
+  "description": "Active pre-settlement governance and blast-radius circuit breaker for AP2/x402 agent payment mandates on Google Cloud and Base Sepolia.",
+  "controller": {
+    "organization": "Wardstone Governance Fleet",
+    "role": "AI Agent Fleet Controller",
+    "wallet": "0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1"
+  },
+  "protocols_supported": [
+    "AP2/v1.0",
+    "x402/BaseSepolia",
+    "A2A-RPC/v1.0"
+  ],
+  "capabilities": [
+    {
+      "name": "query_pre_clearance",
+      "description": "Pre-flight blast-radius risk evaluation for an intended AP2 payment mandate prior to signing",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "buyer_agent_id": { "type": "string" },
+          "amount_usdc": { "type": "number" },
+          "intended_service": { "type": "string" }
+        },
+        "required": ["buyer_agent_id", "amount_usdc"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "pre_clearance_status": { "type": "string", "enum": ["PRE_APPROVED", "REQUIRES_REVIEW", "BLOCKED"] },
+          "projected_risk_score": { "type": "number" },
+          "max_allowable_instant_mandate": { "type": "number" }
+        }
+      }
+    },
+    {
+      "name": "submit_mandate_for_settlement",
+      "description": "Submit signed AP2 mandate through active circuit breaker gatekeeper for on-chain settlement",
+      "endpoint": "/api/v1/mandates/submit"
+    }
+  ],
+  "governance_policy": {
+    "risk_threshold_hold": 60.0,
+    "max_velocity_hourly_usdc": 500.0,
+    "settlement_rail": "Base Sepolia (Chain ID: 84532)"
+  }
+}
