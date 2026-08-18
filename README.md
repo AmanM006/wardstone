@@ -2,11 +2,15 @@
 
 **An autonomous multi-agent governance platform and predictive circuit breaker for the Google & Coinbase AP2 / x402 Agent Payments Protocol, built on Google Cloud, Google ADK, Base Sepolia testnet, and Gemini 3.5 Flash.**
 
-[![Built with Google ADK](https://img.shields.io/badge/Google-ADK%202.7-4285F4.svg)](https://github.com/google/adk-python)
-[![Powered by Gemini 3.5 Flash](https://img.shields.io/badge/Gemini-3.5%20Flash-34A853.svg)](https://ai.google.dev/)
-[![Settlement Rail: Base Sepolia](https://img.shields.io/badge/Base%20Sepolia-x402%20Settlement-0052FF.svg)](https://sepolia.basescan.org)
-[![Cloud Run Ready](https://img.shields.io/badge/Deploy-Google%20Cloud%20Run-EA4335.svg)](https://cloud.google.com/run)
+[![Live Cloud Run](https://img.shields.io/badge/Google%20Cloud%20Run-Live%20Service-34A853.svg)](https://wardstone-ap2-900526798908.us-central1.run.app)
+[![Verified Settlement](https://img.shields.io/badge/EVM%20Settlement-Verified%20On--Chain-0052FF.svg)](https://sepolia.etherscan.io/tx/0x07e58acc8c57fd85759b7a770f198e5b8874cda85a8fb658fae0ec0d94886e10)
+[![Powered by Gemini](https://img.shields.io/badge/Gemini-2.5%20Flash-4285F4.svg)](https://ai.google.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+### 🌐 Live Production Links:
+* **Google Cloud Run Backend**: [https://wardstone-ap2-900526798908.us-central1.run.app](https://wardstone-ap2-900526798908.us-central1.run.app)
+* **Live Health Check**: [https://wardstone-ap2-900526798908.us-central1.run.app/api/v1/health](https://wardstone-ap2-900526798908.us-central1.run.app/api/v1/health)
+* **Verified On-Chain Tx**: [Etherscan Tx `0x07e58acc...`](https://sepolia.etherscan.io/tx/0x07e58acc8c57fd85759b7a770f198e5b8874cda85a8fb658fae0ec0d94886e10)
 
 ---
 
