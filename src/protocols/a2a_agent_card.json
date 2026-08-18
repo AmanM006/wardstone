@@ -4,15 +4,15 @@
   "id": "urn:agent:wardstone-gatekeeper-01",
   "name": "Wardstone Gatekeeper & Circuit Breaker",
   "version": "1.0.1",
-  "description": "Active pre-settlement governance and blast-radius circuit breaker for AP2/x402 agent payment mandates on Google Cloud and Base Sepolia.",
+  "description": "Active pre-settlement governance and blast-radius circuit breaker for AP2/x402 agent payment mandates on Google Cloud and Ethereum Sepolia.",
   "controller": {
     "organization": "Wardstone Governance Fleet",
     "role": "AI Agent Fleet Controller",
-    "wallet": "0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1"
+    "wallet": "0x9d744F795Faa53E3173bAF18783baf51B92b98a5"
   },
   "protocols_supported": [
     "AP2/v1.0",
-    "x402/BaseSepolia",
+    "x402/EthereumSepolia",
     "A2A-RPC/v1.0"
   ],
   "capabilities": [
@@ -46,6 +46,6 @@
   "governance_policy": {
     "risk_threshold_hold": 60.0,
     "max_velocity_hourly_usdc": 500.0,
-    "settlement_rail": "Base Sepolia (Chain ID: 84532)"
+    "settlement_rail": "Ethereum Sepolia (Chain ID: 11155111)"
   }
 }

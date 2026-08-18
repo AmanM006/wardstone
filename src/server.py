@@ -110,6 +110,57 @@ async def get_a2a_agent_card():
     raise HTTPException(status_code=404, detail="A2A Agent Card not found")
 
 
+@app.get("/api/v1/registry")
+async def get_agent_registry():
+    """
+    Fortified Enterprise Fleet Pillar 1: Discovery & Lifecycle (Agent Registry).
+    Returns all cataloged Agent Cards, capabilities, and operational lifecycle status.
+    """
+    card_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "protocols", "a2a_agent_card.json"))
+    base_card = {}
+    if os.path.exists(card_path):
+        with open(card_path, "r", encoding="utf-8") as f:
+            base_card = json.load(f)
+
+    profiles = firestore_client.list_agent_profiles()
+    catalog = [
+        {
+            "agent_id": "urn:agent:wardstone-gatekeeper-01",
+            "agent_name": "Wardstone Gatekeeper & Circuit Breaker",
+            "role": "Governance Sentry",
+            "version": "1.0.1",
+            "status": "ONLINE",
+            "protocols": ["AP2/v1.0", "x402/EthereumSepolia", "A2A-RPC/v1.0"],
+            "capabilities": ["query_pre_clearance", "submit_mandate_for_settlement", "blast_radius_containment"],
+            "agent_card": base_card
+        }
+    ]
+
+    for p in profiles:
+        aid = p.get("agent_id")
+        aname = p.get("agent_name", aid)
+        catalog.append({
+            "agent_id": aid,
+            "agent_name": aname,
+            "role": "Fleet Worker",
+            "version": "1.0.0",
+            "status": "ONLINE" if p.get("reputation_score", 0) > 50 else "QUARANTINED",
+            "protocols": ["AP2/v1.0"],
+            "baseline_hourly_velocity": p.get("baseline_hourly_velocity", 25.0),
+            "max_single_mandate": p.get("max_single_mandate", 50.0),
+            "reputation_score": p.get("reputation_score", 95.0),
+            "total_settled_usdc": p.get("total_settled_usdc", 0.0),
+            "historical_mandates_count": p.get("historical_mandates_count", 0)
+        })
+
+    return {
+        "registry_version": "1.0.0",
+        "pillar": "Discovery & Lifecycle (Agent Registry)",
+        "total_registered_agents": len(catalog),
+        "agents": catalog
+    }
+
+
 class PreClearanceRequest(BaseModel):
     buyer_agent_id: str
     amount_usdc: float
