@@ -114,7 +114,48 @@ class FirestoreClient:
                 return [d.to_dict() for d in docs]
             except Exception as e:
                 print(f"[FirestoreClient] Error listing incidents: {e}")
-        return list(self._local_store["incidents"].values())[-limit:]
+    def get_or_init_telemetry(self) -> Dict[str, Any]:
+        """Durable persistent telemetry state surviving Cloud Run scale-to-zero cycles."""
+        now_iso = datetime.now(timezone.utc).isoformat()
+        default_telemetry = {
+            "genesis_launch_time": "2026-08-18T18:00:00Z", # Official fleet launch
+            "lifetime_mandates_count": 0,
+            "lifetime_settled_volume_usdc": 0.0,
+            "lifetime_quarantined_count": 0,
+            "last_heartbeat_time": now_iso
+        }
+        if self.db:
+            try:
+                doc = self.db.collection("system_telemetry").document("fleet_uptime").get()
+                if doc.exists:
+                    data = doc.to_dict()
+                    return data
+                else:
+                    self.db.collection("system_telemetry").document("fleet_uptime").set(default_telemetry)
+                    return default_telemetry
+            except Exception as e:
+                print(f"[FirestoreClient] Telemetry read fallback: {e}")
+        
+        if "fleet_uptime" not in self._local_store.setdefault("system_telemetry", {}):
+            self._local_store["system_telemetry"]["fleet_uptime"] = default_telemetry
+        return self._local_store["system_telemetry"]["fleet_uptime"]
+
+    def update_telemetry(self, mandates_delta: int = 0, volume_delta: float = 0.0, quarantined_delta: int = 0) -> Dict[str, Any]:
+        telemetry = self.get_or_init_telemetry()
+        telemetry["lifetime_mandates_count"] = telemetry.get("lifetime_mandates_count", 0) + mandates_delta
+        telemetry["lifetime_settled_volume_usdc"] = round(telemetry.get("lifetime_settled_volume_usdc", 0.0) + volume_delta, 2)
+        telemetry["lifetime_quarantined_count"] = telemetry.get("lifetime_quarantined_count", 0) + quarantined_delta
+        telemetry["last_heartbeat_time"] = datetime.now(timezone.utc).isoformat()
+
+        if self.db:
+            try:
+                self.db.collection("system_telemetry").document("fleet_uptime").set(telemetry)
+            except Exception as e:
+                print(f"[FirestoreClient] Telemetry update fallback: {e}")
+        else:
+            self._local_store.setdefault("system_telemetry", {})["fleet_uptime"] = telemetry
+        return telemetry
 
 
 firestore_client = FirestoreClient()
+

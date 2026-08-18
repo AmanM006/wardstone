@@ -166,61 +166,53 @@ class MemoryBank:
     def calculate_adaptive_ema_velocity(
         self,
         agent_id: str,
-        alpha: float = 0.25,
-        half_life_seconds: int = 1800
+        alpha: float = 0.25
     ) -> Tuple[float, float]:
         """
-        Adaptive Forecaster Baseline: Computes Exponential Moving Average (EMA) of hourly velocity
-        with time-decay weighting across historical observations.
+        Adaptive Forecaster Baseline: Computes standard recursive Exponential Moving Average (EMA)
+        across chronologically ordered historical transaction intervals.
         Returns: (adaptive_ema_baseline, variance_sigma)
         """
         profile = self.profiles.get(agent_id)
         if not profile or len(profile.recent_transactions) < 2:
             base = profile.baseline_hourly_velocity if profile else 20.0
-            return base, max(base * 0.2, 2.0)
+            return base, max(base * 0.25, 2.0)
 
-        now = datetime.now(timezone.utc)
-        decay_constant = math.log(2.0) / max(half_life_seconds, 60.0)
-
-        weighted_velocities = []
-        weights = []
-
-        # Analyze transaction intervals to compute instantaneous velocity samples
-        txs = profile.recent_transactions[-20:]
-        for i in range(1, len(txs)):
+        # Sort chronologically
+        valid_txs = []
+        for tx in profile.recent_transactions:
             try:
-                t_prev = datetime.fromisoformat(txs[i-1]["timestamp"])
-                t_curr = datetime.fromisoformat(txs[i]["timestamp"])
-                delta_sec = max((t_curr - t_prev).total_seconds(), 1.0)
-                amount = float(txs[i].get("amount_usdc", 0.0))
-                
-                # Project instantaneous velocity to hourly scale
-                inst_hourly_vel = (amount / delta_sec) * 3600.0
-                
-                # Time decay from current time
-                age_sec = max((now - t_curr).total_seconds(), 0.0)
-                weight = math.exp(-decay_constant * age_sec)
-                
-                weighted_velocities.append(inst_hourly_vel)
-                weights.append(weight)
+                t = datetime.fromisoformat(tx["timestamp"])
+                amt = float(tx.get("amount_usdc", 0.0))
+                valid_txs.append((t, amt))
             except Exception:
                 continue
 
-        if not weights or sum(weights) == 0:
-            return profile.baseline_hourly_velocity, max(profile.baseline_hourly_velocity * 0.2, 2.0)
+        valid_txs.sort(key=lambda x: x[0])
+        if len(valid_txs) < 2:
+            return profile.baseline_hourly_velocity, max(profile.baseline_hourly_velocity * 0.25, 2.0)
 
-        # Weighted Mean (EMA)
-        total_weight = sum(weights)
-        ema_mean = sum(v * w for v, w in zip(weighted_velocities, weights)) / total_weight
-        
-        # Smooth with prior static baseline
-        adaptive_baseline = (alpha * ema_mean) + ((1.0 - alpha) * profile.baseline_hourly_velocity)
-        
-        # Weighted Standard Deviation
-        variance = sum(w * ((v - ema_mean) ** 2) for v, w in zip(weighted_velocities, weights)) / total_weight
+        # Compute instantaneous hourly velocity samples bounded by minimum interval of 300s (5m)
+        samples = []
+        for i in range(1, len(valid_txs)):
+            delta_sec = max((valid_txs[i][0] - valid_txs[i-1][0]).total_seconds(), 300.0)
+            amt = valid_txs[i][1]
+            hourly_rate = (amt / delta_sec) * 3600.0
+            samples.append(hourly_rate)
+
+        if not samples:
+            return profile.baseline_hourly_velocity, max(profile.baseline_hourly_velocity * 0.25, 2.0)
+
+        # Recursive Exponential Moving Average (EMA)
+        current_ema = profile.baseline_hourly_velocity
+        for s in samples:
+            current_ema = (alpha * s) + ((1.0 - alpha) * current_ema)
+
+        # Standard deviation across samples
+        variance = sum((s - current_ema) ** 2 for s in samples) / len(samples)
         sigma = math.sqrt(max(variance, 1.0))
 
-        return round(adaptive_baseline, 2), round(sigma, 2)
+        return round(current_ema, 2), round(sigma, 2)
 
 
 memory_bank = MemoryBank()
