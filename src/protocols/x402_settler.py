@@ -1,6 +1,6 @@
 """
-Official x402 Facilitator Settlement Rail for Base Sepolia
-Executes on-chain micropayment settlements for approved AP2 mandates using Web3 / Base Sepolia RPC.
+Official x402 Facilitator Settlement Rail for Base Sepolia & Multi-Chain Testnets
+Executes on-chain micropayment settlements for approved AP2 mandates using Web3.
 """
 
 from typing import Dict, Any, Optional, Tuple
@@ -13,33 +13,10 @@ from src.config import settings
 from src.protocols.ap2_schema import AP2PaymentMandate, SettlementDecision
 
 
-# Standard ERC20 minimal ABI for USDC transfer
-ERC20_MINIMAL_ABI = [
-    {
-        "constant": False,
-        "inputs": [
-            {"name": "_to", "type": "address"},
-            {"name": "_value", "type": "uint256"}
-        ],
-        "name": "transfer",
-        "outputs": [{"name": "", "type": "bool"}],
-        "type": "function"
-    },
-    {
-        "constant": True,
-        "inputs": [{"name": "_owner", "type": "address"}],
-        "name": "balanceOf",
-        "outputs": [{"name": "balance", "type": "uint256"}],
-        "type": "function"
-    }
-]
-
-
 class X402Settler:
     def __init__(self):
         self.rpc_url = settings.base_sepolia_rpc_url
         self.w3 = Web3(Web3.HTTPProvider(self.rpc_url, request_kwargs={"timeout": 15}))
-        self.usdc_address = settings.usdc_token_address
         self.account: Optional[LocalAccount] = None
         self._init_account()
 
@@ -53,12 +30,11 @@ class X402Settler:
             except Exception as e:
                 print(f"[X402Settler] Error loading private key: {e}")
         
-        # Deterministic testnet settlement wallet for testnet demonstration
-        # (Derived safely for Base Sepolia testnet)
-        test_key = os.environ.get("TESTNET_SETTLER_KEY", "0x4f3edf983ac636a65a842ce7c78d9aa706d3b113bce9c46f30d7d21715b23b1d")
+        # Fallback test key if unset
+        test_key = os.environ.get("TESTNET_SETTLER_KEY", "0x6b44278d7b4ca5402e11b136fa54c38a61aea9bb0f282dc3bb8b9271bde4852a")
         try:
             self.account = Account.from_key(test_key)
-            print(f"[X402Settler] Using Base Sepolia testnet wallet: {self.account.address}")
+            print(f"[X402Settler] Using settlement wallet: {self.account.address}")
         except Exception as e:
             print(f"[X402Settler] Wallet generation fallback: {e}")
 
@@ -86,10 +62,10 @@ class X402Settler:
 
     def execute_settlement(self, mandate: AP2PaymentMandate) -> Tuple[bool, SettlementDecision]:
         """
-        Executes on-chain settlement on Base Sepolia testnet.
-        Constructs signed transaction, broadcasts to Base Sepolia RPC, and captures tx_hash.
+        Executes on-chain settlement on the connected RPC network.
+        Dynamically derives chainId from the connected node to prevent replay rejection.
         """
-        if not self.w3.is_connected():
+        if not self.w3.is_connected() or not self.account:
             return False, SettlementDecision(
                 mandate_id=mandate.mandate_id,
                 agent_id=mandate.buyer_agent.agent_id,
@@ -103,46 +79,40 @@ class X402Settler:
         amount_usdc = mandate.total_amount_usdc
 
         try:
-            # Check checksummed destination address
             dest_checksum = Web3.to_checksum_address(destination)
-            sender_address = self.account.address if self.account else "0x0000000000000000000000000000000000000000"
+            sender_address = self.account.address
             
-            # Base Sepolia transaction structure
             nonce = self.w3.eth.get_transaction_count(sender_address)
             gas_price = self.w3.eth.gas_price
+            chain_id = self.w3.eth.chain_id # Dynamically read Chain ID from connected network
             
-            # For Base Sepolia native micropayment or USDC transfer
-            # Micro-transfer of 0.0001 test-ETH representing the settlement proof
+            # Settlement payload transaction (0.00005 ETH proof of payment)
             tx_data = {
                 'nonce': nonce,
                 'to': dest_checksum,
                 'value': self.w3.to_wei(0.00005, 'ether'),
                 'gas': 25000,
-                'gasPrice': int(gas_price * 1.2),
-                'chainId': 84532 # Base Sepolia Chain ID
+                'gasPrice': int(gas_price * 1.3),
+                'chainId': chain_id
             }
 
-            if self.account:
-                signed_tx = self.w3.eth.account.sign_transaction(tx_data, self.account.key)
-                # REAL BROADCAST ONLY: Must be sent to Base Sepolia RPC
-                tx_hash_bytes = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
-                tx_hash = self.w3.to_hex(tx_hash_bytes)
-                print(f"[X402Settler] Real settlement broadcasted on Base Sepolia! TxHash: {tx_hash}")
-                
-                return True, SettlementDecision(
-                    mandate_id=mandate.mandate_id,
-                    agent_id=mandate.buyer_agent.agent_id,
-                    status="APPROVED",
-                    risk_score=15.0,
-                    action_taken="SETTLED_ON_CHAIN",
-                    tx_hash=tx_hash,
-                    block_number=self.w3.eth.block_number
-                )
-            else:
-                raise ValueError("No settlement wallet account loaded in X402Settler")
+            signed_tx = self.w3.eth.account.sign_transaction(tx_data, self.account.key)
+            tx_hash_bytes = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+            tx_hash = self.w3.to_hex(tx_hash_bytes)
+            print(f"[X402Settler] Real settlement broadcasted on Chain ID {chain_id}! TxHash: {tx_hash}")
+            
+            return True, SettlementDecision(
+                mandate_id=mandate.mandate_id,
+                agent_id=mandate.buyer_agent.agent_id,
+                status="APPROVED",
+                risk_score=15.0,
+                action_taken="SETTLED_ON_CHAIN",
+                tx_hash=tx_hash,
+                block_number=self.w3.eth.block_number
+            )
 
         except Exception as e:
-            print(f"[X402Settler] Real settlement broadcast FAILED on Base Sepolia: {e}")
+            print(f"[X402Settler] Real settlement broadcast FAILED on Chain ID {self.w3.eth.chain_id if self.w3.is_connected() else 'Unknown'}: {e}")
             return False, SettlementDecision(
                 mandate_id=mandate.mandate_id,
                 agent_id=mandate.buyer_agent.agent_id,

@@ -30,7 +30,7 @@ except ImportError:
 class ForensicsAgent:
     def __init__(self, name: str = "ForensicsAgent"):
         self.name = name
-        self.model_name = settings.gemini_model or "gemini-2.5-flash"
+        self.model_name = settings.gemini_model or "gemini-2.5-flash-lite"
         self.client = None
         self._init_gemini()
 
@@ -54,7 +54,7 @@ class ForensicsAgent:
         decision: SettlementDecision
     ) -> ForensicIncidentReport:
         """
-        Calls Gemini API with live wall-clock timing.
+        Calls Gemini API with live wall-clock timing and retry resiliency.
         """
         buyer_name = mandate.buyer_agent.agent_name
         buyer_id = mandate.buyer_agent.agent_id
@@ -88,55 +88,66 @@ Respond strictly with valid JSON.
             raise ValueError("Cannot generate forensic autopsy: GEMINI_API_KEY is not configured or client failed to initialize.")
 
         start_time = time.perf_counter()
-        try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    temperature=0.2
+        
+        # Try primary model, fallback to fast lite model if 503 spike occurs
+        models_to_try = [self.model_name, "gemini-2.5-flash-lite", "gemini-2.5-flash"]
+        # deduplicate while preserving order
+        seen = set()
+        models = [m for m in models_to_try if not (m in seen or seen.add(m))]
+
+        last_error = None
+        for m in models:
+            try:
+                response = self.client.models.generate_content(
+                    model=m,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        temperature=0.2
+                    )
                 )
-            )
-            elapsed_ms = (time.perf_counter() - start_time) * 1000.0
-            print(f"[{self.name}] Real Gemini API Call Completed in {elapsed_ms:.1f}ms (Wall-clock latency)")
+                elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+                print(f"[{self.name}] Real Gemini API ({m}) Call Completed in {elapsed_ms:.1f}ms (Wall-clock latency)")
 
-            if not response or not response.text:
-                raise ValueError("Empty response received from Gemini API")
+                if not response or not response.text:
+                    raise ValueError(f"Empty response received from Gemini API ({m})")
 
-            parsed = json.loads(response.text)
-            summary = parsed.get("anomaly_summary", "Quarantined by automated circuit breaker.")
-            explanation = parsed.get("root_cause_explanation", "Velocity limit exceeded.")
-            remediation = parsed.get("recommended_remediation", "Throttle agent spend cap.")
-            affected = parsed.get("affected_components", [buyer_id, mandate.destination_wallet])
+                parsed = json.loads(response.text)
+                summary = parsed.get("anomaly_summary", "Quarantined by automated circuit breaker.")
+                explanation = parsed.get("root_cause_explanation", "Velocity limit exceeded.")
+                remediation = parsed.get("recommended_remediation", "Throttle agent spend cap.")
+                affected = parsed.get("affected_components", [buyer_id, mandate.destination_wallet])
 
-            if isinstance(remediation, list):
-                remediation = " ".join(str(x) for x in remediation)
-            if isinstance(explanation, list):
-                explanation = " ".join(str(x) for x in explanation)
-            if isinstance(summary, list):
-                summary = " ".join(str(x) for x in summary)
+                if isinstance(remediation, list):
+                    remediation = " ".join(str(x) for x in remediation)
+                if isinstance(explanation, list):
+                    explanation = " ".join(str(x) for x in explanation)
+                if isinstance(summary, list):
+                    summary = " ".join(str(x) for x in summary)
 
-            report = ForensicIncidentReport(
-                mandate_id=mandate.mandate_id,
-                agent_id=buyer_id,
-                agent_name=buyer_name,
-                risk_score=risk_score,
-                attempted_amount_usdc=amount,
-                anomaly_summary=summary,
-                root_cause_explanation=explanation,
-                affected_components=affected,
-                recommended_remediation=remediation,
-                status="ACTIVE_HOLD"
-            )
+                report = ForensicIncidentReport(
+                    mandate_id=mandate.mandate_id,
+                    agent_id=buyer_id,
+                    agent_name=buyer_name,
+                    risk_score=risk_score,
+                    attempted_amount_usdc=amount,
+                    anomaly_summary=summary,
+                    root_cause_explanation=explanation,
+                    affected_components=affected,
+                    recommended_remediation=remediation,
+                    status="ACTIVE_HOLD"
+                )
 
-            # Save incident to Firestore collection 'incidents'
-            firestore_client.save_incident(report.incident_id, report.model_dump(mode="json"))
-            return report
+                # Save incident to Firestore collection 'incidents'
+                firestore_client.save_incident(report.incident_id, report.model_dump(mode="json"))
+                return report
 
-        except Exception as e:
-            elapsed_ms = (time.perf_counter() - start_time) * 1000.0
-            print(f"[{self.name}] Real Gemini API call FAILED after {elapsed_ms:.1f}ms: {e}")
-            raise e
+            except Exception as err:
+                print(f"[{self.name}] Notice: model {m} attempt encountered: {err}. Trying resilient backup...")
+                last_error = err
+
+        elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+        raise last_error or RuntimeError(f"All Gemini models failed after {elapsed_ms:.1f}ms")
 
 
 forensics_agent = ForensicsAgent()
