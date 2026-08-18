@@ -73,6 +73,16 @@ class RootOrchestrator:
         if decision.status == "HELD":
             incident_report = forensics_agent.generate_incident_report(mandate, risk_result, decision)
 
+        # Step 5: Update persistent telemetry counters in Firestore
+        vol_delta = mandate.total_amount_usdc if decision.status == "APPROVED" else 0.0
+        quarantined_delta = 1 if decision.status == "HELD" else 0
+        from src.storage.firestore_client import firestore_client
+        firestore_client.update_telemetry(
+            mandates_delta=1,
+            volume_delta=vol_delta,
+            quarantined_delta=quarantined_delta
+        )
+
         end_time = datetime.now(timezone.utc)
         elapsed_ms = (end_time - start_time).total_seconds() * 1000.0
 
