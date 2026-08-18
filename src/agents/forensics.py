@@ -71,14 +71,14 @@ Incident Telemetry:
 - Buyer Agent: {buyer_name} ({buyer_id})
 - Seller Destination: {mandate.destination_wallet}
 - Attempted Amount: {amount} USDC
-- Baseline Hourly Velocity: ${risk_result.baseline_hourly_velocity}/hr
-- Projected Velocity: ${risk_result.projected_velocity}/hr ({risk_result.velocity_variance_ratio}x baseline)
+- Adaptive EMA Baseline: ${risk_result.baseline_hourly_velocity}/hr (Time-decay weighted Exponential Moving Average)
+- Projected Rolling Velocity: ${risk_result.projected_velocity}/hr ({risk_result.velocity_variance_ratio}x adaptive baseline)
 - Risk Score: {risk_score}/100
 - Anomaly Flags: {', '.join(flags)}
 
 Generate a structured JSON response with:
 1. "anomaly_summary": A one-sentence executive summary of what went wrong.
-2. "root_cause_explanation": A concise 2-3 paragraph plain-English breakdown of why this mandate was quarantined, explaining the statistical velocity spike, single-mandate ratio, and potential rogue loop behavior.
+2. "root_cause_explanation": A concise 2-3 paragraph plain-English breakdown of why this mandate was quarantined, specifically referencing the adaptive exponential moving average (EMA) baseline deviation, standard deviation shifts, smurfing bursts (if detected), and potential rogue loop behavior.
 3. "affected_components": List of affected agent tools or wallet resources.
 4. "recommended_remediation": Specific corrective action for the AI Agent Fleet Controller.
 
