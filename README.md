@@ -49,7 +49,7 @@ graph TD
         WATCH["1. Watcher Agent<br/>(Normalizes Mandates → Firestore)"]
         FORE["2. Forecaster Agent<br/>(Memory Bank History → 0-100 Blast Risk)"]
         GATE["3. Gatekeeper Agent<br/>(Threshold Policy & A2A Agent Card)"]
-        FOREN["4. Forensics Agent (Gemini 2.5 Flash)<br/>(Causal Postmortem & Remediation Scribe)"]
+        FOREN["4. Forensics Agent (Gemini 3.5 Flash-Lite)<br/>(Causal Postmortem & Remediation Scribe)"]
         
         MB[("Agent Engine Memory Bank<br/>Spend Baselines & Profiles")]
     end
@@ -66,24 +66,30 @@ graph TD
         INC[("Firestore `incidents` Collection")]
     end
 
-    EXT -->|Emits Payment Mandate| PS
-    EXT <-->|Queries Pre-Clearance| AC_EXT
+    EXT -->|"Emits Payment Mandate"| PS
+    EXT <-->|"Queries Pre-Clearance"| AC_EXT
     AC_EXT <--> GATE
 
     PS --> WATCH
-    ORCH --> WATCH & FORE & GATE & FOREN
+    ORCH --> WATCH
+    ORCH --> FORE
+    ORCH --> GATE
+    ORCH --> FOREN
 
     WATCH --> FORE
     FORE <--> MB
-    FORE -->|Risk Score| GATE
+    FORE -->|"Risk Score"| GATE
 
-    GATE -->|Low Risk (Score < 60)| X402 --> TX
-    GATE -->|High Risk (Score >= 60)| BLOCK
+    GATE -->|"Low Risk (Score under 60)"| X402
+    X402 --> TX
+    GATE -->|"High Risk (Score 60 or above)"| BLOCK
     BLOCK --> FOREN
     FOREN --> INC
 
     ORCH --> OTEL
-    INC & MB & PS --> DASH
+    INC --> DASH
+    MB --> DASH
+    PS --> DASH
 ```
 
 ---
@@ -95,7 +101,7 @@ graph TD
 | **1. Watcher Agent** | Subscribes to Pub/Sub events, parses AP2 schemas, normalizes records into Firestore. | Does *not* calculate risk scores, does *not* execute payments. |
 | **2. Forecaster Agent** | Queries **Agent Engine Memory Bank**, calculates velocity variance & deviation, outputs 0–100 Blast Risk. | Does *not* make binary approve/deny policy decisions. |
 | **3. Gatekeeper Agent** | Applies threshold policy (`Score < 60`), authorizes on-chain EVM Sepolia settlement, or trips Circuit Breaker. Exposes **A2A Agent Card**. | Does *not* generate long-form forensic reports. |
-| **4. Forensics Agent** | Ingests quarantined mandates and prompts **Gemini 2.5 Flash** to draft executive-ready, plain-English incident postmortems. | Never touches money or settlement credentials. |
+| **4. Forensics Agent** | Ingests quarantined mandates and prompts **Gemini 3.5 (Flash-Lite / Flash)** to draft executive-ready, plain-English incident postmortems. | Never touches money or settlement credentials. |
 
 ---
 
