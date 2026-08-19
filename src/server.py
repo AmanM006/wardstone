@@ -108,7 +108,11 @@ async def get_uptime_stats():
         sum(float(m.get("total_amount_usdc", 0.0)) for m in mandates if m.get("status") == "APPROVED"),
         telemetry.get("lifetime_settled_volume_usdc", 0.0)
     )
-    last_act = mandates[0].get("created_at") if mandates else telemetry.get("last_heartbeat_time", now.isoformat())
+    last_act = None
+    if mandates:
+        last_act = mandates[0].get("created_at") or mandates[0].get("timestamp") or mandates[0].get("governance_decision", {}).get("timestamp")
+    if not last_act:
+        last_act = telemetry.get("last_heartbeat_time") or now.isoformat()
 
     return {
         "service": "wardstone-ap2-circuit-breaker",
@@ -176,6 +180,13 @@ async def get_agent_registry():
             base_card = json.load(f)
 
     profiles = firestore_client.list_agent_profiles()
+    if not profiles and memory_bank.profiles:
+        profiles = [p.to_dict() for p in memory_bank.profiles.values()]
+    if not profiles or len(profiles) < 5:
+        from scripts.seed_agent_personas import seed
+        seed()
+        profiles = [p.to_dict() for p in memory_bank.profiles.values()]
+
     catalog = [
         {
             "agent_id": "urn:agent:wardstone-gatekeeper-01",
@@ -195,7 +206,7 @@ async def get_agent_registry():
         catalog.append({
             "agent_id": aid,
             "agent_name": aname,
-            "role": "Fleet Worker",
+            "role": "Fleet Worker" if "adversarial" not in aid and "compromised" not in aid else "Red Team Probe / Rogue Test Target",
             "version": "1.0.0",
             "status": "ONLINE" if p.get("reputation_score", 0) > 50 else "QUARANTINED",
             "protocols": ["AP2/v1.0"],
