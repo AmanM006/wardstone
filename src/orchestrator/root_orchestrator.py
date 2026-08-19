@@ -47,55 +47,61 @@ class RootOrchestrator:
                 "incident": None
             }
 
-        # Record attempt into active memory window for short-horizon burst tracking
-        from src.storage.memory_bank import memory_bank
-        memory_bank.record_mandate_attempt(mandate)
+        from src.telemetry.otel_config import trace_agent_span, tracer
 
-        # Step 2: Forecaster Evaluation (with Resilience & Recovery wrapper)
-        if simulate_forecaster_failure:
-            def broken_forecaster(m):
-                raise TimeoutError("Simulated Forecaster worker timeout / malformed output injection")
-            forecaster_func = broken_forecaster
-        else:
-            forecaster_func = forecaster_agent.evaluate_mandate_risk
+        with tracer.start_as_current_span("orchestrator.pipeline", attributes={"ap2.mandate_id": mandate.mandate_id}):
+            # Record attempt into active memory window for short-horizon burst tracking
+            from src.storage.memory_bank import memory_bank
+            memory_bank.record_mandate_attempt(mandate)
 
-        risk_result = recovery_manager.execute_with_fallback(
-            worker_name="ForecasterAgent",
-            worker_func=forecaster_func,
-            mandate=mandate
-        )
+            # Step 2: Forecaster Evaluation (with Resilience & Recovery wrapper)
+            if simulate_forecaster_failure:
+                def broken_forecaster(m):
+                    raise TimeoutError("Simulated Forecaster worker timeout / malformed output injection")
+                forecaster_func = broken_forecaster
+            else:
+                forecaster_func = forecaster_agent.evaluate_mandate_risk
 
-        # Step 3: Gatekeeper Policy Enforcement & Settlement Rail
-        settled, decision = gatekeeper_agent.evaluate_and_settle(mandate, risk_result)
+            with trace_agent_span("ForecasterAgent", mandate.mandate_id):
+                risk_result = recovery_manager.execute_with_fallback(
+                    worker_name="ForecasterAgent",
+                    worker_func=forecaster_func,
+                    mandate=mandate
+                )
 
-        # Step 4: Forensics Autopsy (if held by circuit breaker)
-        incident_report = None
-        if decision.status == "HELD":
-            incident_report = forensics_agent.generate_incident_report(mandate, risk_result, decision)
+            # Step 3: Gatekeeper Policy Enforcement & Settlement Rail
+            with trace_agent_span("GatekeeperAgent", mandate.mandate_id):
+                settled, decision = gatekeeper_agent.evaluate_and_settle(mandate, risk_result)
 
-        # Step 5: Update persistent telemetry counters in Firestore
-        vol_delta = mandate.total_amount_usdc if decision.status == "APPROVED" else 0.0
-        quarantined_delta = 1 if decision.status == "HELD" else 0
-        from src.storage.firestore_client import firestore_client
-        firestore_client.update_telemetry(
-            mandates_delta=1,
-            volume_delta=vol_delta,
-            quarantined_delta=quarantined_delta
-        )
+            # Step 4: Forensics Autopsy (if held by circuit breaker)
+            incident_report = None
+            if decision.status == "HELD":
+                with trace_agent_span("ForensicsAgent", mandate.mandate_id):
+                    incident_report = forensics_agent.generate_incident_report(mandate, risk_result, decision)
 
-        end_time = datetime.now(timezone.utc)
-        elapsed_ms = (end_time - start_time).total_seconds() * 1000.0
+            # Step 5: Update persistent telemetry counters in Firestore
+            vol_delta = mandate.total_amount_usdc if decision.status == "APPROVED" else 0.0
+            quarantined_delta = 1 if decision.status == "HELD" else 0
+            from src.storage.firestore_client import firestore_client
+            firestore_client.update_telemetry(
+                mandates_delta=1,
+                volume_delta=vol_delta,
+                quarantined_delta=quarantined_delta
+            )
 
-        return {
-            "success": True,
-            "mandate_id": mandate.mandate_id,
-            "buyer_agent": mandate.buyer_agent.agent_name,
-            "amount_usdc": mandate.total_amount_usdc,
-            "risk_score": risk_result.risk_score,
-            "decision": decision.model_dump(mode="json"),
-            "incident": incident_report.model_dump(mode="json") if incident_report else None,
-            "elapsed_ms": round(elapsed_ms, 2)
-        }
+            end_time = datetime.now(timezone.utc)
+            elapsed_ms = (end_time - start_time).total_seconds() * 1000.0
+
+            return {
+                "success": True,
+                "mandate_id": mandate.mandate_id,
+                "buyer_agent": mandate.buyer_agent.agent_name,
+                "amount_usdc": mandate.total_amount_usdc,
+                "risk_score": risk_result.risk_score,
+                "decision": decision.model_dump(mode="json"),
+                "incident": incident_report.model_dump(mode="json") if incident_report else None,
+                "elapsed_ms": round(elapsed_ms, 2)
+            }
 
 
 root_orchestrator = RootOrchestrator()
