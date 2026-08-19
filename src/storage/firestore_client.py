@@ -29,13 +29,13 @@ class FirestoreClient:
         self._init_client()
 
     def _init_client(self):
-        if HAS_GCP_FIRESTORE and os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
+        if HAS_GCP_FIRESTORE:
             try:
                 self.db = firestore.Client(project=self.project_id)
                 print(f"[FirestoreClient] Connected to GCP Firestore (Project: {self.project_id})")
                 return
             except Exception as e:
-                print(f"[FirestoreClient] GCP Firestore connection warning: {e}. Utilizing persistent local store.")
+                print(f"[FirestoreClient] GCP Firestore connection notice: {e}. Operating in resilient local store mode.")
         self.db = None
         print(f"[FirestoreClient] Operating in local memory store mode.")
 
@@ -114,6 +114,8 @@ class FirestoreClient:
                 return [d.to_dict() for d in docs]
             except Exception as e:
                 print(f"[FirestoreClient] Error listing incidents: {e}")
+        return list(self._local_store["incidents"].values())[-limit:]
+
     def get_or_init_telemetry(self) -> Dict[str, Any]:
         """Durable persistent telemetry state surviving Cloud Run scale-to-zero cycles."""
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -131,6 +133,13 @@ class FirestoreClient:
                     data = doc.to_dict()
                     return data
                 else:
+                    try:
+                        mandates_count = len(list(self.db.collection("mandates").stream()))
+                        incidents_count = len(list(self.db.collection("incidents").stream()))
+                        default_telemetry["lifetime_mandates_count"] = mandates_count
+                        default_telemetry["lifetime_quarantined_count"] = incidents_count
+                    except Exception:
+                        pass
                     self.db.collection("system_telemetry").document("fleet_uptime").set(default_telemetry)
                     return default_telemetry
             except Exception as e:
