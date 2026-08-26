@@ -483,17 +483,12 @@ class TTSRequest(BaseModel):
 async def generate_tts(req: TTSRequest):
     try:
         from google.cloud import texttospeech
-        import os
-        
-        # Reset credentials if needed, or rely on ADC
-        if "GOOGLE_APPLICATION_CREDENTIALS" in os.environ and not os.path.exists(os.environ["GOOGLE_APPLICATION_CREDENTIALS"]):
-            os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS")
-            
+        # Use ADC — works on Cloud Run automatically, and locally with gcloud auth
         client = texttospeech.TextToSpeechClient()
-        input_text = texttospeech.SynthesisInput(text=req.text)
+        input_text = texttospeech.SynthesisInput(text=req.text[:500])  # cap length
         voice = texttospeech.VoiceSelectionParams(
             language_code="en-US",
-            name="en-US-Journey-O" # A nice premium voice
+            name="en-US-Journey-O"
         )
         audio_config = texttospeech.AudioConfig(
             audio_encoding=texttospeech.AudioEncoding.MP3

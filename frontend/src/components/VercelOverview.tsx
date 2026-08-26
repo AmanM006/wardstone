@@ -273,6 +273,9 @@ export const VercelOverview: React.FC<VercelOverviewProps> = ({
               const r: any = m.raw_payload || m;
               const d: any = m.governance_decision || {};
               const rk: any = m.risk_analysis || {};
+              const amt = Number(m.total_amount_usdc || r.total_amount_usdc || 0);
+              const score = Number(rk.risk_score || 0);
+              const id = m.mandate_id || r.mandate_id || `mandate-${idx}`;
               const isIncident = incidents.some(inc => inc.mandate_id === id);
               const isHeld = m.status === 'HELD' || d.status === 'HELD' || score >= 60 || isIncident;
 
