@@ -6,13 +6,13 @@
 
 ## 1. Introduction: The Unsupervised Agent Economy
 
-In 2026, AI agents are no longer passive chat assistants. Using Google and Coinbase's new **Agent Payment Protocol (AP2) and x402 on-chain micropayment standard**, agents autonomously procure compute, pay for vector embeddings, and hire specialized sub-agents.
+In 2026, AI agents are no longer passive chat assistants. Using Google and Coinbase's new **Agent Payment Protocol (AP2) and on-chain micropayment standard**, agents autonomously procure compute, pay for vector embeddings, and hire specialized sub-agents.
 
 However, giving autonomous background agents financial wallets introduces a critical systemic risk: **Runaway Spend Loops and Blast-Radius Acceleration**. If an agent encounters an unhandled prompt exception or recursive loop, it can burn through hundreds of dollars in automated micropayments in minutes before any human notices.
 
 Existing API gateways only show **post-facto logs after money has already been spent**. 
 
-To solve this, we built **Wardstone AP2** — an active, predictive circuit breaker for the **AI Agent Fleet Controller** that calculates blast-radius variance and quarantines anomalous payment mandates *before* on-chain finality on Base Sepolia.
+To solve this, we built **Wardstone AP2** — an active, predictive circuit breaker for the **AI Agent Fleet Controller** that calculates blast-radius variance and quarantines anomalous payment mandates *before* on-chain finality on Ethereum Sepolia.
 
 ---
 
@@ -21,17 +21,17 @@ To solve this, we built **Wardstone AP2** — an active, predictive circuit brea
 Wardstone is built with **Google Agent Development Kit (ADK 2.7)** and **Gemini 3.5 Flash** using a 4-agent separation of concerns:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│              ROOT ORCHESTRATOR (Google ADK)                 │
-│      Supervises state machine, retries, and recovery        │
-└───────┬─────────────┬──────────────┬───────────────┬────────┘
-        │             │              │               │
-   ┌────▼────┐   ┌────▼──────┐  ┌────▼──────┐   ┌────▼──────┐
-   │ Watcher │   │Forecaster │  │Gatekeeper │   │ Forensics │
-   │  Agent  │──▶│   Agent   │─▶│   Agent   │──▶│   Agent   │
-   └─────────┘   └───────────┘  └───────────┘   └───────────┘
-        │             │              │               │
-   Cloud Pub/Sub  Memory Bank    Base Sepolia    Gemini 3.5
+┌────────────────────────────────────────────────────────────────┐
+│              ROOT ORCHESTRATOR (Google ADK)                    │
+│      Supervises state machine, retries, and recovery           │
+└───────┬────────────────┬────────────────┬───────────────┬──────┘
+        │                │                │               │
+   ┌────┴─────┐     ┌────┴─────┐     ┌────┴─────┐    ┌────┴─────┐
+   │ Watcher  │     │Forecaster│     │Gatekeeper│    │ Forensics│
+   │  Agent   │───> │  Agent   │───> │  Agent   │──> │  Agent   │
+   └────┬─────┘     └────┬─────┘     └────┬─────┘    └────┬─────┘
+        │                │                │               │
+   Cloud Pub/Sub  Memory Bank    Ethereum Sepolia Gemini 3.5
      Ingestion    (Baselines)     Settlement     Postmortems
 ```
 
@@ -39,16 +39,16 @@ Wardstone is built with **Google Agent Development Kit (ADK 2.7)** and **Gemini 
 Subscribes to Google Cloud Pub/Sub (`mandate-events`), normalizes AP2 payloads (Intent, Cart, Payment Mandate), and writes records to Google Cloud Firestore.
 
 ### 2. Forecaster Agent
-Queries the **Agent Engine Memory Bank** for the agent's historical spend profile. Calculates moving-window rolling velocity and assigns a dynamic **0–100 Blast-Radius Risk Score**.
+Queries the **Agent Engine Memory Bank** for the agent's historical spend profile. Calculates moving-window rolling velocity and assigns a dynamic **0-100 Blast-Radius Risk Score**. Crucially, it monitors the **destination burst tracker** to catch cross-agent collusion—detecting when multiple distinct agents attempt to sybil-attack or smurf funds into a single target wallet.
 
 ### 3. Gatekeeper Agent
 Enforces governance thresholds:
-* **Score < 60 (Low Risk)**: Authorizes official x402 on-chain settlement on **Base Sepolia testnet**, generating a verifiable transaction hash on BaseScan.
-* **Score $\ge$ 60 (High Risk)**: Trips the circuit breaker, halting settlement with **provably zero on-chain token movement**.
+* **Score < 60 (Low Risk)**: Authorizes official on-chain settlement on **Ethereum Sepolia testnet**, generating a verifiable transaction hash on Etherscan.
+* **Score >= 60 (High Risk)**: Trips the circuit breaker, halting settlement with **provably zero on-chain token movement**.
 * Exposes an official **A2A Agent Card (JSON-LD)** allowing external buyer agents to query pre-clearance prior to signing.
 
 ### 4. Forensics Agent (Powered by Gemini 3.5 Flash)
-When a mandate is quarantined, the Forensics Agent prompts **Gemini 3.5 Flash** to generate a structured, executive-ready incident postmortem detailing the statistical deviation, affected components, and recommended remediation.
+When a mandate is quarantined, the Forensics Agent prompts **Gemini 3.5 Flash** to generate a structured, executive-ready incident postmortem detailing the statistical deviation, affected components, and recommended remediation. It also implements an **Institutional Memory Feedback Loop**—querying past human overrides (`FORCE_APPROVE`) so the LLM natively learns from past governance actions and injects that context into future anomaly explanations.
 
 ---
 
@@ -66,4 +66,4 @@ If a worker agent crashes or returns malformed schema, the `FailureRecoveryManag
 
 ---
 
-*Built with Google ADK, Gemini 3.5 Flash, Google Cloud Run, Cloud Firestore, Cloud Pub/Sub, and Base Sepolia.*
+*Built with Google ADK, Gemini 3.5 Flash, Google Cloud Run, Cloud Firestore, Cloud Pub/Sub, and Ethereum Sepolia.*
