@@ -18,6 +18,7 @@ from src.protocols.ap2_schema import (
 from src.protocols.x402_settler import x402_settler
 from src.storage.memory_bank import memory_bank
 from src.storage.firestore_client import firestore_client
+from src.bonus.gemma_prescreen import gemma_prescreen
 
 
 class GatekeeperAgent:
@@ -75,6 +76,26 @@ class GatekeeperAgent:
         - If score < 60: settles on Base Sepolia and updates Memory Bank.
         - If score >= 60: trips Circuit Breaker, locks transaction (HELD), forwards to Forensics.
         """
+        # Bonus: Edge Pre-Screen via Gemma 4
+        is_clean, threats = gemma_prescreen.scan_mandate_metadata(mandate.metadata)
+        if not is_clean:
+            print(f"[{self.name}] [REFUSED] Gemma Pre-Screen blocked payload: {threats}")
+            decision = SettlementDecision(
+                mandate_id=mandate.mandate_id,
+                agent_id=mandate.buyer_agent.agent_id,
+                status="REFUSED",
+                risk_score=100.0,
+                action_taken="REFUSED_MALICIOUS_PAYLOAD",
+                tx_hash=None,
+                missing_data_fields=["malicious_payload_detected"]
+            )
+            firestore_client.save_mandate(mandate.mandate_id, {
+                "status": "REFUSED",
+                "governance_decision": decision.model_dump(mode="json"),
+                "risk_analysis": risk_result.model_dump(mode="json")
+            })
+            return False, decision
+
         score = risk_result.risk_score
         
         # ITEM 1: Refused for structurally missing data

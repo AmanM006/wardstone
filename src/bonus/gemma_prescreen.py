@@ -1,6 +1,6 @@
 """
-Bonus Model 1: Real Gemma 2 Lightweight Pre-Screen (Pillar 4)
-Calls Gemma-2-9b-it via the Google GenAI SDK to detect prompt injection, secret leaks, 
+Bonus Model 1: Real Gemma 4 Lightweight Pre-Screen
+Calls Gemma-4-26b-a4b-it via the Google GenAI SDK to detect prompt injection, secret leaks, 
 and malicious payload markers using a semantic firewall instead of weak regex.
 """
 
@@ -25,7 +25,7 @@ class GemmaPreScreen:
 
     def scan_mandate_metadata(self, metadata: Dict[str, Any]) -> Tuple[bool, List[str]]:
         """
-        Scans metadata for prompt injection or leaked credentials using Gemma 2.
+        Scans metadata for prompt injection or leaked credentials using Gemma 4.
         Returns: (is_clean, detected_threats)
         """
         if not self.client:
@@ -56,10 +56,10 @@ Respond ONLY with valid JSON in this format:
                 is_clean = result.get("is_clean", True)
                 threats = result.get("threats", [])
                 if not is_clean:
-                    print(f"[Gemini Firewall] BLOCKED PAYLOAD: {threats}")
+                    print(f"[Gemma Firewall] BLOCKED PAYLOAD: {threats}")
                 return is_clean, threats
         except Exception as e:
-            print(f"[Gemini Firewall] Error invoking Gemini: {e}")
+            print(f"[Gemma Firewall] Error invoking Gemma: {e}")
             
         return True, []
 
