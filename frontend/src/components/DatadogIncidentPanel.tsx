@@ -91,7 +91,31 @@ export const DatadogIncidentPanel: React.FC<DatadogIncidentPanelProps> = ({
             <span className="font-semibold text-white">Active ({mandates.length})</span>
             <span className="text-zinc-500">Triggered ({incidents.length})</span>
           </div>
-          <span className="font-mono text-[11px]">Base Sepolia x402</span>
+          <div className="flex items-center gap-2">
+            <input 
+              type="number" 
+              id="simThreshold" 
+              placeholder="Threshold (e.g. 50)" 
+              className="px-2 py-1 bg-[#111] text-white text-xs border border-zinc-700 rounded w-32"
+            />
+            <button onClick={async () => {
+              const val = (document.getElementById('simThreshold') as HTMLInputElement).value;
+              if(!val) return;
+              const res = await fetch('/api/v1/simulate-policy', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({new_threshold: parseFloat(val)})
+              });
+              const data = await res.json();
+              alert(`Simulation against historical mandates:\n${data.flipped_mandates_count} mandates would flip status.\n${data.flips.map((f: any) => `Mandate ${f.mandate_id}: ${f.old_status} -> ${f.new_status}`).join('\n')}`);
+            }} className="px-2 py-1 bg-[#1a1a1a] hover:bg-[#2a2a2a] text-zinc-300 rounded border border-zinc-700 transition flex items-center gap-1">
+              Simulate Policy
+            </button>
+            <a href="/api/v1/export-compliance" download className="px-2 py-1 bg-[#1a1a1a] hover:bg-[#2a2a2a] text-zinc-300 rounded border border-zinc-700 transition flex items-center gap-1">
+              <span>Export CSV</span>
+            </a>
+            <span className="font-mono text-[11px]">Base Sepolia x402</span>
+          </div>
         </div>
 
         {/* Mandate Rows (Scrollable within column) */}

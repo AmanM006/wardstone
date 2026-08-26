@@ -61,6 +61,22 @@ class ForensicsAgent:
         amount = mandate.total_amount_usdc
         risk_score = risk_result.risk_score
         flags = risk_result.anomaly_flags
+        
+        # ITEM 4: Override Feedback Loop (Institutional Memory)
+        from src.storage.firestore_client import firestore_client
+        override_history = []
+        try:
+            overrides = firestore_client.db.collection("overrides").where("agent_id", "==", buyer_id).get()
+            for ov in overrides:
+                override_history.append(ov.to_dict())
+        except Exception:
+            pass
+            
+        override_context = ""
+        if override_history:
+            override_context = "\nInstitutional Memory (Prior Overrides):\n"
+            for ov in override_history:
+                override_context += f"- Fleet Controller previously FORCE_APPROVED a similar pattern from this agent on {ov.get('timestamp')}: {ov.get('context')}\n"
 
         prompt = f"""
 You are the Wardstone Autonomous Forensics Agent for an AI Agent Payments Fleet.
@@ -73,8 +89,9 @@ Incident Telemetry:
 - Attempted Amount: {amount} USDC
 - Adaptive EMA Baseline: ${risk_result.baseline_hourly_velocity}/hr (Time-decay weighted Exponential Moving Average)
 - Projected Rolling Velocity: ${risk_result.projected_velocity}/hr ({risk_result.velocity_variance_ratio}x adaptive baseline)
-- Risk Score: {risk_score}/100
-- Anomaly Flags: {', '.join(flags)}
+- Final Risk Score: {risk_score}/100
+- Detected Anomalies: {', '.join(flags)}
+{override_context}
 
 Generate a structured JSON response with:
 1. "anomaly_summary": A one-sentence executive summary of what went wrong, including at least one numeric metric (e.g. amount, baseline variance).
@@ -90,7 +107,7 @@ Respond strictly with valid JSON.
         start_time = time.perf_counter()
         
         # Prioritize compliant Gemini 3.5 series with resilient cascade fallbacks
-        models_to_try = [self.model_name, "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash"]
+        models_to_try = [self.model_name, "gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-2.5-flash"]
         # deduplicate while preserving order
         seen = set()
         models = [m for m in models_to_try if not (m in seen or seen.add(m))]

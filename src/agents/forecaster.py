@@ -8,6 +8,7 @@ Does NOT make policy decisions (approve/deny). Does NOT execute settlement.
 
 from typing import Dict, Any, List, Optional
 import math
+import json
 from datetime import datetime, timezone
 from src.protocols.ap2_schema import AP2PaymentMandate, RiskScoreResult
 from src.storage.memory_bank import memory_bank
@@ -58,6 +59,9 @@ class ForecasterAgent:
         
         anomaly_flags: List[str] = []
         
+        # CROSS-AGENT COLLUSION DETECTION
+        is_collusion, collusion_amount, involved_agents = memory_bank.check_collusion_risk(mandate)
+        
         # 4. Anomaly Detection Conditions
         # Single mandate limit checks
         if single_mandate_ratio > 1.0:
@@ -90,6 +94,12 @@ class ForecasterAgent:
         raw_score = 10.0 + single_component + velocity_component + smurf_component
         
         # Penalties for critical anomaly flags
+        if is_collusion:
+            raw_score = max(raw_score, 90.0)
+            anomaly_flags.append("CROSS_AGENT_COLLUSION_PATTERN")
+            # Feed context to forensics LLM
+            anomaly_flags.append(f"Correlated total: {collusion_amount} USDC")
+            anomaly_flags.append(f"Involved agents: {json.dumps(involved_agents)}")
         if "RUNAWAY_RECURSIVE_LOOP_DETECTED" in anomaly_flags:
             raw_score = max(raw_score, 88.0)
         if "CRITICAL_SINGLE_MANDATE_SPIKE" in anomaly_flags:

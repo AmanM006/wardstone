@@ -69,6 +69,7 @@ class AgentSpendProfile:
 class MemoryBank:
     def __init__(self):
         self.profiles: Dict[str, AgentSpendProfile] = {}
+        self.destination_burst_tracker: Dict[str, List[Dict[str, Any]]] = {}
         self._load_profiles()
 
     def _load_profiles(self):
@@ -77,6 +78,43 @@ class MemoryBank:
             agent_id = rec.get("agent_id")
             if agent_id:
                 self.profiles[agent_id] = AgentSpendProfile.from_dict(rec)
+
+    def check_collusion_risk(self, mandate: AP2PaymentMandate, window_minutes: int = 15, threshold_usdc: float = 100.0) -> Tuple[bool, float, List[Dict]]:
+        """
+        Check if multiple distinct agents are sending funds to the same destination wallet within a short window,
+        exceeding a combined threshold.
+        """
+        dest_wallet = mandate.destination_wallet
+        if not dest_wallet:
+            return False, 0.0, []
+        
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(minutes=window_minutes)
+        
+        history = self.destination_burst_tracker.get(dest_wallet, [])
+        # Clean old entries
+        history = [h for h in history if datetime.fromisoformat(h['timestamp']) >= cutoff]
+        self.destination_burst_tracker[dest_wallet] = history
+        
+        # Calculate totals per agent for this destination
+        agent_totals = {}
+        for h in history:
+            agent_totals[h['agent_id']] = agent_totals.get(h['agent_id'], 0.0) + h['amount_usdc']
+            
+        # Add current mandate (if not already counted)
+        # Note: we don't add it to history here, it's added in record_mandate_attempt
+        current_agent = mandate.buyer_agent.agent_id
+        agent_totals[current_agent] = agent_totals.get(current_agent, 0.0) + mandate.total_amount_usdc
+        
+        # Check if more than 1 agent is involved
+        if len(agent_totals) > 1:
+            combined_total = sum(agent_totals.values())
+            if combined_total >= threshold_usdc:
+                # Collusion detected!
+                involved_agents = [{"agent_id": k, "amount": v} for k, v in agent_totals.items()]
+                return True, combined_total, involved_agents
+                
+        return False, 0.0, []
 
     def get_or_create_profile(self, identity: AP2AgentIdentity) -> AgentSpendProfile:
         if identity.agent_id not in self.profiles:
@@ -93,13 +131,27 @@ class MemoryBank:
     def record_mandate_attempt(self, mandate: AP2PaymentMandate):
         """Records an attempted/evaluated mandate into the sliding activity window."""
         profile = self.get_or_create_profile(mandate.buyer_agent)
+        now = datetime.now(timezone.utc)
         profile.recent_transactions.append({
             "mandate_id": mandate.mandate_id,
             "amount_usdc": mandate.total_amount_usdc,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": now.isoformat(),
             "tx_hash": None
         })
-        profile.recent_transactions = profile.recent_transactions[-50:]
+        if len(profile.recent_transactions) > 100:
+            profile.recent_transactions = profile.recent_transactions[-100:]
+
+        # Also track for cross-agent collusion
+        dest_wallet = mandate.destination_wallet
+        if dest_wallet:
+            if dest_wallet not in self.destination_burst_tracker:
+                self.destination_burst_tracker[dest_wallet] = []
+            self.destination_burst_tracker[dest_wallet].append({
+                "mandate_id": mandate.mandate_id,
+                "agent_id": mandate.buyer_agent.agent_id,
+                "amount_usdc": mandate.total_amount_usdc,
+                "timestamp": now.isoformat()
+            })
 
     def record_settled_mandate(self, mandate: AP2PaymentMandate, tx_hash: Optional[str] = None):
         profile = self.get_or_create_profile(mandate.buyer_agent)

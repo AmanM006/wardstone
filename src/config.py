@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     google_cloud_project: str = Field(default="wardstone-ap2-dev", alias="GOOGLE_CLOUD_PROJECT")
     google_application_credentials: Optional[str] = Field(default=None, alias="GOOGLE_APPLICATION_CREDENTIALS")
     gemini_api_key: Optional[str] = Field(default=None, alias="GEMINI_API_KEY")
-    gemini_model: str = Field(default="gemini-3.5-flash", alias="GEMINI_MODEL")
+    gemini_model: str = Field(default="gemini-2.5-flash", alias="GEMINI_MODEL")
 
     # Pub/Sub Topics
     pubsub_topic_mandates: str = Field(default="mandate-events", alias="PUBSUB_TOPIC_MANDATES")

@@ -183,11 +183,22 @@ async def override_incident(req: OverrideRequest):
         firestore_client.save_incident(req.incident_id, inc_data)
         return {"status": "success", "message": f"Agent {agent_id} banned permanently."}
         
-    elif req.action == "FORCE_APPROVE":
-        # 1. Update incident status
-        inc_data["status"] = "HUMAN_OVERRIDE_APPROVED"
-        firestore_client.save_incident(req.incident_id, inc_data)
+    if req.action == "FORCE_APPROVE":
+        incident.reference.update({"status": "HUMAN_OVERRIDE_APPROVED"})
         
+        # ITEM 4: Save override feedback for institutional memory
+        if agent_id:
+            anomaly_summary = inc_data.get("anomaly_summary", "")
+            override_record = {
+                "agent_id": agent_id,
+                "mandate_id": req.mandate_id,
+                "incident_id": req.incident_id,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "action": "FORCE_APPROVE",
+                "context": anomaly_summary
+            }
+            firestore_client.db.collection("overrides").add(override_record)
+            
         # 2. Update agent profile to learn from false positive
         if agent_id:
             profile = memory_bank.profiles.get(agent_id)
@@ -278,6 +289,82 @@ async def get_agent_registry():
         "agents": catalog
     }
 
+
+class PolicySimulationRequest(BaseModel):
+    new_threshold: float
+
+@app.post("/api/v1/simulate-policy")
+async def simulate_policy(req: PolicySimulationRequest):
+    """
+    Test a threshold change against historical mandate data before committing it live.
+    """
+    from src.storage.firestore_client import firestore_client
+    
+    historical_mandates = firestore_client.list_mandates()
+    historical_incidents = firestore_client.list_incidents()
+    
+    held_mandate_ids = {inc["mandate_id"] for inc in historical_incidents}
+    
+    flips = []
+    
+    for doc in historical_mandates:
+        mandate_id = doc.get("mandate_id")
+        score = doc.get("risk_score", 0.0)
+        
+        was_held = mandate_id in held_mandate_ids
+        would_be_held = score >= req.new_threshold
+        
+        if was_held and not would_be_held:
+            flips.append({
+                "mandate_id": mandate_id,
+                "score": score,
+                "old_status": "HELD",
+                "new_status": "APPROVED"
+            })
+        elif not was_held and would_be_held:
+            flips.append({
+                "mandate_id": mandate_id,
+                "score": score,
+                "old_status": "APPROVED",
+                "new_status": "HELD"
+            })
+            
+    return {
+        "proposed_threshold": req.new_threshold,
+        "total_historical_mandates": len(historical_mandates),
+        "flipped_mandates_count": len(flips),
+        "flips": flips
+    }
+
+from fastapi.responses import PlainTextResponse
+
+@app.get("/api/v1/export-compliance", response_class=PlainTextResponse)
+async def export_compliance():
+    from src.storage.firestore_client import firestore_client
+    import csv
+    import io
+    
+    incidents = firestore_client.list_incidents()
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Incident ID", "Timestamp", "Mandate ID", "Agent ID", "Risk Score", "Status", "Governance Hash"])
+    
+    for inc in incidents:
+        writer.writerow([
+            inc.get("incident_id"),
+            inc.get("timestamp"),
+            inc.get("mandate_id"),
+            inc.get("agent_id"),
+            inc.get("risk_score"),
+            inc.get("status"),
+            inc.get("governance_hash", "UNVERIFIED")
+        ])
+        
+    response = PlainTextResponse(content=output.getvalue())
+    response.headers["Content-Disposition"] = "attachment; filename=wardstone_compliance_export.csv"
+    response.headers["Content-Type"] = "text/csv"
+    return response
 
 class PreClearanceRequest(BaseModel):
     buyer_agent_id: str
