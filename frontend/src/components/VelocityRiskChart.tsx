@@ -13,7 +13,8 @@ export const VelocityRiskChart: React.FC<VelocityRiskChartProps> = ({ mandates }
 
   let totalSettled = 0;
   mandates.forEach((m) => {
-    const isApproved = m.status === 'APPROVED' || m.governance_decision?.status === 'APPROVED';
+    const score = m.risk_analysis?.risk_score || 0;
+    const isApproved = m.status === 'APPROVED' || m.governance_decision?.status === 'APPROVED' || (score > 0 && score < 60);
     if (isApproved) {
       totalSettled += Number(m.total_amount_usdc || (m as any).raw_payload?.total_amount_usdc || 0);
     }

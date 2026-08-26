@@ -273,10 +273,8 @@ export const VercelOverview: React.FC<VercelOverviewProps> = ({
               const r: any = m.raw_payload || m;
               const d: any = m.governance_decision || {};
               const rk: any = m.risk_analysis || {};
-              const amt = Number(m.total_amount_usdc || r.total_amount_usdc || 0);
-              const score = Number(rk.risk_score || 0);
-              const isHeld = m.status === 'HELD' || d.status === 'HELD' || score >= 60;
-              const id = m.mandate_id || r.mandate_id || `mandate-${idx}`;
+              const isIncident = incidents.some(inc => inc.mandate_id === id);
+              const isHeld = m.status === 'HELD' || d.status === 'HELD' || score >= 60 || isIncident;
 
               return (
                 <div
@@ -335,7 +333,13 @@ export const VercelOverview: React.FC<VercelOverviewProps> = ({
                       <span className="w-3.5 h-3.5" />
                     )}
 
-                    <MoreHorizontal className="w-3.5 h-3.5 text-zinc-600 group-hover:text-zinc-400 transition" />
+                    <button
+                       className="opacity-0 group-hover:opacity-100 transition px-2 py-1 text-[10px] text-zinc-400 hover:text-white hover:bg-[#1a1a1a] rounded border border-transparent hover:border-[#333] font-mono"
+                       title="Copy Mandate ID"
+                       onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(id); }}
+                     >
+                       Copy ID
+                     </button>
                   </div>
                 </div>
               );
