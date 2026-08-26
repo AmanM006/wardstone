@@ -89,7 +89,7 @@ class GatekeeperAgent:
                 tx_hash=None,
                 missing_data_fields=["malicious_payload_detected"]
             )
-            firestore_client.save_mandate(mandate.mandate_id, {
+            firestore_client.update_mandate(mandate.mandate_id, {
                 "status": "REFUSED",
                 "governance_decision": decision.model_dump(mode="json"),
                 "risk_analysis": risk_result.model_dump(mode="json")
@@ -110,7 +110,7 @@ class GatekeeperAgent:
                 tx_hash=None,
                 missing_data_fields=["agent_history"]
             )
-            firestore_client.save_mandate(mandate.mandate_id, {
+            firestore_client.update_mandate(mandate.mandate_id, {
                 "status": "REFUSED",
                 "governance_decision": decision.model_dump(mode="json"),
                 "risk_analysis": risk_result.model_dump(mode="json")
@@ -139,8 +139,8 @@ class GatekeeperAgent:
                 tx_hash=None,
                 resolution_evidence_required="Human review of agent intention and baseline profile confirmation."
             )
-            # Update Firestore record
-            firestore_client.save_mandate(mandate.mandate_id, {
+            # Merge-update Firestore record — preserves raw_payload and buyer_agent fields
+            firestore_client.update_mandate(mandate.mandate_id, {
                 "status": "HELD",
                 "governance_decision": decision.model_dump(mode="json"),
                 "risk_analysis": risk_result.model_dump(mode="json")
@@ -161,7 +161,7 @@ class GatekeeperAgent:
         else:
             memory_bank.record_rejected_mandate(mandate)
 
-        firestore_client.save_mandate(mandate.mandate_id, {
+        firestore_client.update_mandate(mandate.mandate_id, {
             "status": decision.status,
             "governance_decision": decision.model_dump(mode="json"),
             "risk_analysis": risk_result.model_dump(mode="json")

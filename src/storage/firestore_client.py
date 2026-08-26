@@ -49,6 +49,20 @@ class FirestoreClient:
         self._local_store["mandates"][mandate_id] = data
         return True
 
+    def update_mandate(self, mandate_id: str, data: Dict[str, Any]) -> bool:
+        """Merge-update an existing mandate document without overwriting other fields."""
+        if self.db:
+            try:
+                self.db.collection("mandates").document(mandate_id).set(data, merge=True)
+                return True
+            except Exception as e:
+                print(f"[FirestoreClient] Error updating mandate in GCP: {e}")
+        # For local store: merge-update
+        existing = self._local_store["mandates"].get(mandate_id, {})
+        existing.update(data)
+        self._local_store["mandates"][mandate_id] = existing
+        return True
+
     def get_mandate(self, mandate_id: str) -> Optional[Dict[str, Any]]:
         if self.db:
             try:

@@ -140,7 +140,21 @@ export default function DashboardPage() {
       setLoadingScenario(scenario);
       const result = await triggerSimulation(scenario);
       await refreshAll();
-      // Show toast and navigate to mandates so user sees the new mandate
+      // Auto-select the newly created mandate so user sees it
+      const newMandateId: string = result.mandate_id;
+      if (newMandateId) {
+        // Brief delay to let state settle then find and select the new mandate
+        setTimeout(() => {
+          setMandates(prev => {
+            const found = prev.find((m: AP2PaymentMandate) => {
+              const r: any = m.raw_payload || m;
+              return (m.mandate_id || r.mandate_id) === newMandateId;
+            });
+            if (found) setSelectedMandate(found);
+            return prev;
+          });
+        }, 300);
+      }
       const isRogue = result.risk_score >= 60;
       setToast({
         type: isRogue ? 'error' : 'success',
@@ -149,7 +163,6 @@ export default function DashboardPage() {
           : `✅ Mandate settled — ${result.buyer_agent}: $${result.amount_usdc} USDC (Risk: ${result.risk_score}/100)`,
       });
       setTimeout(() => setToast(null), 6000);
-      // Navigate to mandates tab so they see the new entry
       handleNavigate('MANDATES', 'mandates');
     } catch (err: any) {
       setToast({ type: 'error', message: `Simulation failed: ${err.message}` });
