@@ -25,6 +25,20 @@ class ForecasterAgent:
         buyer_id = mandate.buyer_agent.agent_id
         profile = memory_bank.get_or_create_profile(mandate.buyer_agent)
         
+        # ITEM 1: Check for structurally missing data (brand new agent with zero prior record)
+        # Note: root_orchestrator calls record_mandate_attempt BEFORE forecaster, so len is 1.
+        if profile.historical_mandates_count == 0 and len(profile.recent_transactions) <= 1:
+            return RiskScoreResult(
+                mandate_id=mandate.mandate_id,
+                agent_id=buyer_id,
+                risk_score=0.0,
+                baseline_hourly_velocity=0.0,
+                projected_velocity=0.0,
+                velocity_variance_ratio=0.0,
+                anomaly_flags=["MISSING_AGENT_HISTORY"],
+                confidence=0.0
+            )
+
         amount = mandate.total_amount_usdc
         declared_limit = max(mandate.buyer_agent.declared_spend_limit_usd, 1.0)
         
@@ -85,15 +99,27 @@ class ForecasterAgent:
             
         final_score = min(max(round(raw_score, 1), 5.0), 99.0)
         
+        # Pillar 1: Zero-Trust Penalty (Fixing the Risk Math)
+        # Instead of artificially lowering risk for unknown agents, we penalize them until they establish a baseline.
+        approvals = profile.historical_mandates_count
+        if approvals < 5:
+            # 1.5x risk multiplier for unproven agents
+            effective_risk_score = min(final_score * 1.5, 99.0)
+            anomaly_flags.append("ZERO_TRUST_PENALTY")
+            print(f"[{self.name}] Applying Zero-Trust Penalty (History: {approvals} < 5). Adjusted Score: {effective_risk_score:.1f}")
+        else:
+            # Stable baseline achieved
+            effective_risk_score = final_score
+
         result = RiskScoreResult(
             mandate_id=mandate.mandate_id,
             agent_id=buyer_id,
-            risk_score=final_score,
+            risk_score=effective_risk_score,
             baseline_hourly_velocity=round(effective_baseline, 2),
             projected_velocity=round(projected_velocity, 2),
             velocity_variance_ratio=round(velocity_variance_ratio, 2),
             anomaly_flags=anomaly_flags,
-            confidence=0.96
+            confidence=round((approvals + 2) / (approvals + profile.historical_rejected_count + 3), 3)
         )
         
         print(f"[{self.name}] Evaluated {mandate.mandate_id} -> Risk Score: {final_score}/100 (EMA Baseline: ${effective_baseline:.1f}/hr, Variance: {velocity_variance_ratio:.2f}x, Flags: {anomaly_flags})")

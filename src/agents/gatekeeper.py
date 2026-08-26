@@ -71,21 +71,52 @@ class GatekeeperAgent:
     ) -> Tuple[bool, SettlementDecision]:
         """
         Applies policy threshold:
+        - If score == 0.0 with missing history -> REFUSED (no funds moved).
         - If score < 60: settles on Base Sepolia and updates Memory Bank.
-        - If score >= 60: halts settlement immediately (circuit breaker quarantine).
+        - If score >= 60: trips Circuit Breaker, locks transaction (HELD), forwards to Forensics.
         """
         score = risk_result.risk_score
         
-        # Policy Check: Circuit Breaker Trip Condition
+        # ITEM 1: Refused for structurally missing data
+        if score == 0.0 and "MISSING_AGENT_HISTORY" in risk_result.anomaly_flags:
+            print(f"[{self.name}] [REFUSED] Mandate {mandate.mandate_id} due to structurally missing data.")
+            decision = SettlementDecision(
+                mandate_id=mandate.mandate_id,
+                agent_id=mandate.buyer_agent.agent_id,
+                status="REFUSED",
+                risk_score=0.0,
+                action_taken="REFUSED_MISSING_DATA",
+                tx_hash=None,
+                missing_data_fields=["agent_history"]
+            )
+            firestore_client.save_mandate(mandate.mandate_id, {
+                "status": "REFUSED",
+                "governance_decision": decision.model_dump(mode="json"),
+                "risk_analysis": risk_result.model_dump(mode="json")
+            })
+            memory_bank.record_rejected_mandate(mandate)
+            return False, decision
+            
+        # Policy Check: Circuit Breaker Trip Condition (HELD)
         if score >= self.threshold_hold:
-            print(f"[{self.name}] [CIRCUIT BREAKER TRIPPED] Mandate {mandate.mandate_id} Risk: {score}/100 >= Threshold: {self.threshold_hold}")
+            print(f"[{self.name}] [CIRCUIT BREAKER TRIPPED] Mandate {mandate.mandate_id} Risk: {score:.1f} >= Threshold: {self.threshold_hold}")
+            
+            # Pillar 2: The "Blast Radius" IAM Kill Switch
+            if score >= 95.0:
+                # Pillar 2: IAM Kill Switch Trigger
+                profile = memory_bank.get_or_create_profile(mandate.buyer_agent)
+                profile.agent_status = "REVOKED"
+                firestore_client.save_agent_profile(profile.agent_id, profile.to_dict())
+                print(f"[{self.name}] [KILL SWITCH] Agent {profile.agent_id} exceeded critical threshold {score}/100. IAM access revoked.")
+            
             decision = SettlementDecision(
                 mandate_id=mandate.mandate_id,
                 agent_id=mandate.buyer_agent.agent_id,
                 status="HELD",
                 risk_score=score,
                 action_taken="QUARANTINED_CIRCUIT_BREAKER",
-                tx_hash=None
+                tx_hash=None,
+                resolution_evidence_required="Human review of agent intention and baseline profile confirmation."
             )
             # Update Firestore record
             firestore_client.save_mandate(mandate.mandate_id, {
@@ -93,10 +124,11 @@ class GatekeeperAgent:
                 "governance_decision": decision.model_dump(mode="json"),
                 "risk_analysis": risk_result.model_dump(mode="json")
             })
+            memory_bank.record_rejected_mandate(mandate)
             return False, decision
 
         # Low-Risk: Proceed with Real Base Sepolia On-Chain Settlement
-        print(f"[{self.name}] [APPROVED] Mandate {mandate.mandate_id} Risk: {score}/100 < Threshold: {self.threshold_hold}. Proceeding to x402 settlement...")
+        print(f"[{self.name}] [APPROVED] Mandate {mandate.mandate_id} Risk: {score:.1f} < Threshold: {self.threshold_hold}. Proceeding to x402 settlement...")
         settle_ok, decision = x402_settler.execute_settlement(mandate)
         
         decision.risk_score = score
@@ -105,6 +137,8 @@ class GatekeeperAgent:
         # Update Memory Bank with settled transaction
         if settle_ok and decision.tx_hash:
             memory_bank.record_settled_mandate(mandate, tx_hash=decision.tx_hash)
+        else:
+            memory_bank.record_rejected_mandate(mandate)
 
         firestore_client.save_mandate(mandate.mandate_id, {
             "status": decision.status,

@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Lenis from 'lenis';
 import { AP2PaymentMandate, ForensicIncidentReport } from '@/types';
+import { overrideIncident } from '@/lib/api';
 import { CheckCircle2, Volume2, Network, Flame, Send, MessageSquare, ExternalLink, ShieldCheck, ShieldAlert, ChevronRight } from 'lucide-react';
 
 interface DatadogIncidentPanelProps {
@@ -292,6 +293,38 @@ export const DatadogIncidentPanel: React.FC<DatadogIncidentPanelProps> = ({
                 <div className="p-3 bg-[#1e1505] border border-[#3d2c0b] rounded-lg text-amber-200 text-xs">
                   <strong>Investigative Remediation: </strong>
                   {matchingIncident.recommended_remediation}
+                </div>
+              )}
+
+              {matchingIncident?.governance_hash && (
+                <div className="p-3 bg-[#0a101a] border border-[#1a2b4c] rounded-lg text-sky-300 text-xs font-mono break-all">
+                  <strong>[Proof of Governance]: </strong>
+                  {matchingIncident.governance_hash}
+                </div>
+              )}
+
+              {matchingIncident && isHeld && (
+                <div className="flex gap-2 pt-2">
+                  <button 
+                    onClick={() => {
+                      overrideIncident(matchingIncident.incident_id, matchingIncident.mandate_id, 'FORCE_APPROVE', 'fleet-controller-1')
+                        .then(() => alert('Mandate forcefully approved.'))
+                        .catch(e => alert('Error: ' + e.message));
+                    }}
+                    className="px-3 py-1.5 text-[11px] font-bold bg-[#082818] hover:bg-[#0a3822] text-emerald-400 border border-emerald-900/60 rounded-md transition"
+                  >
+                    Force Approve
+                  </button>
+                  <button 
+                    onClick={() => {
+                      overrideIncident(matchingIncident.incident_id, matchingIncident.mandate_id, 'CONFIRM_BAN', 'fleet-controller-1')
+                        .then(() => alert('Agent permanently banned.'))
+                        .catch(e => alert('Error: ' + e.message));
+                    }}
+                    className="px-3 py-1.5 text-[11px] font-bold bg-[#330808] hover:bg-[#4a0a0a] text-rose-400 border border-rose-900/60 rounded-md transition"
+                  >
+                    Confirm Ban
+                  </button>
                 </div>
               )}
             </div>

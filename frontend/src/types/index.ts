@@ -67,6 +67,7 @@ export interface ForensicIncidentReport {
   diagram_svg?: string;
   generated_at: string;
   status: string;
+  governance_hash?: string;
 }
 
 export interface AgentSpendProfile {

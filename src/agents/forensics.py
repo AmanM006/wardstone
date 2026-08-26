@@ -77,8 +77,8 @@ Incident Telemetry:
 - Anomaly Flags: {', '.join(flags)}
 
 Generate a structured JSON response with:
-1. "anomaly_summary": A one-sentence executive summary of what went wrong.
-2. "root_cause_explanation": A concise 2-3 paragraph plain-English breakdown of why this mandate was quarantined, specifically referencing the adaptive exponential moving average (EMA) baseline deviation, standard deviation shifts, smurfing bursts (if detected), and potential rogue loop behavior.
+1. "anomaly_summary": A one-sentence executive summary of what went wrong, including at least one numeric metric (e.g. amount, baseline variance).
+2. "root_cause_explanation": A concise 2-3 paragraph plain-English breakdown of why this mandate was quarantined. You MUST explicitly cite specific numeric evidence from the telemetry provided (e.g., exact dollar amounts, precise hourly baseline vs projected velocity, variance ratio, or confidence score). Do not just state general patterns.
 3. "affected_components": List of affected agent tools or wallet resources.
 4. "recommended_remediation": Specific corrective action for the AI Agent Fleet Controller.
 
@@ -125,6 +125,8 @@ Respond strictly with valid JSON.
                 if isinstance(summary, list):
                     summary = " ".join(str(x) for x in summary)
 
+                import hashlib
+                
                 report = ForensicIncidentReport(
                     mandate_id=mandate.mandate_id,
                     agent_id=buyer_id,
@@ -137,6 +139,48 @@ Respond strictly with valid JSON.
                     recommended_remediation=remediation,
                     status="ACTIVE_HOLD"
                 )
+
+                # Pillar 5: Cryptographic "Proof of Governance"
+                # Hash the deterministic fields to prove the AI governance decision was untampered
+                report_dict = report.model_dump(mode="json")
+                hash_input = f"{report.incident_id}:{report.mandate_id}:{report.risk_score}:{report.anomaly_summary}"
+                report.governance_hash = hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
+
+                # Generate SVG topological graph
+                color = "#f87171" if risk_score >= 60 else "#34d399"
+                status_text = "QUARANTINE_ACTIVE" if risk_score >= 60 else "CLEARED"
+                svg = f"""
+                <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg" style="font-family: monospace; width: 100%; height: 100%;">
+                    <!-- Edges -->
+                    <line x1="100" y1="100" x2="250" y2="100" stroke="#333" stroke-width="2" stroke-dasharray="4" />
+                    <line x1="250" y1="100" x2="400" y2="100" stroke="{color}" stroke-width="3" />
+                    <line x1="400" y1="100" x2="520" y2="100" stroke="#333" stroke-width="2" stroke-dasharray="4" />
+                    
+                    <!-- Agent Node -->
+                    <circle cx="100" cy="100" r="30" fill="#1a1a1a" stroke="#444" stroke-width="2" />
+                    <text x="100" y="145" fill="#aaa" font-size="10" text-anchor="middle">{buyer_name[:15]}..</text>
+                    <text x="100" y="105" fill="#fff" font-size="20" text-anchor="middle">🤖</text>
+                    
+                    <!-- Gatekeeper Node -->
+                    <rect x="220" y="75" width="60" height="50" rx="8" fill="#1a1a1a" stroke="#444" stroke-width="2" />
+                    <text x="250" y="145" fill="#aaa" font-size="10" text-anchor="middle">Gatekeeper</text>
+                    <text x="250" y="105" fill="#fff" font-size="20" text-anchor="middle">🛡️</text>
+
+                    <!-- Risk Node -->
+                    <circle cx="400" cy="100" r="40" fill="#1a1a1a" stroke="{color}" stroke-width="3" />
+                    <text x="400" y="95" fill="{color}" font-size="14" font-weight="bold" text-anchor="middle">RISK</text>
+                    <text x="400" y="115" fill="{color}" font-size="18" font-weight="bold" text-anchor="middle">{risk_score}</text>
+                    
+                    <!-- Destination Node -->
+                    <circle cx="520" cy="100" r="30" fill="#1a1a1a" stroke="#444" stroke-width="2" />
+                    <text x="520" y="145" fill="#aaa" font-size="10" text-anchor="middle">Base Sepolia</text>
+                    <text x="520" y="105" fill="#fff" font-size="20" text-anchor="middle">🏦</text>
+                    
+                    <!-- Status Text -->
+                    <text x="325" y="80" fill="{color}" font-size="10" font-weight="bold" text-anchor="middle">{status_text}</text>
+                </svg>
+                """
+                report.diagram_svg = svg.strip()
 
                 # Save incident to Firestore collection 'incidents'
                 firestore_client.save_incident(report.incident_id, report.model_dump(mode="json"))

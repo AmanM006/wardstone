@@ -9,7 +9,15 @@ interface VelocityRiskChartProps {
 
 export const VelocityRiskChart: React.FC<VelocityRiskChartProps> = ({ mandates }) => {
   const highRiskCount = mandates.filter((m) => (m.risk_analysis?.risk_score || 0) >= 60).length;
-  const highRiskPct = mandates.length > 0 ? ((highRiskCount / mandates.length) * 100).toFixed(1) : '15.5';
+  const highRiskPct = mandates.length > 0 ? ((highRiskCount / mandates.length) * 100).toFixed(1) : '0.0';
+
+  let totalSettled = 0;
+  mandates.forEach((m) => {
+    const isApproved = m.status === 'APPROVED' || m.governance_decision?.status === 'APPROVED';
+    if (isApproved) {
+      totalSettled += Number(m.total_amount_usdc || (m as any).raw_payload?.total_amount_usdc || 0);
+    }
+  });
 
   return (
     <div className="space-y-6 font-sans select-text">
@@ -20,7 +28,7 @@ export const VelocityRiskChart: React.FC<VelocityRiskChartProps> = ({ mandates }
             Total Input Mandates
           </div>
           <div className="text-3xl font-light text-white tracking-tight mt-2 font-mono">
-            {mandates.length > 0 ? mandates.length * 12 + 142 : '29,430'}
+            {mandates.length}
           </div>
         </div>
 
@@ -29,7 +37,7 @@ export const VelocityRiskChart: React.FC<VelocityRiskChartProps> = ({ mandates }
             Total Output Volume
           </div>
           <div className="text-3xl font-light text-white tracking-tight mt-2 font-mono">
-            10,320 <span className="text-xs text-zinc-500 font-sans">USDC</span>
+            {totalSettled.toFixed(2)} <span className="text-xs text-zinc-500 font-sans">USDC</span>
           </div>
         </div>
 

@@ -106,3 +106,13 @@ export async function triggerSimulation(scenario: string): Promise<any> {
     throw err;
   }
 }
+
+export async function overrideIncident(incident_id: string, mandate_id: string, override_type: 'FORCE_APPROVE' | 'CONFIRM_BAN', controller_id: string = 'fleet-controller-1') {
+  const res = await fetch(`${API_BASE}/api/v1/incidents/override`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ incident_id, mandate_id, override_type, controller_id })
+  });
+  if (!res.ok) throw new Error('Override failed');
+  return await res.json();
+}

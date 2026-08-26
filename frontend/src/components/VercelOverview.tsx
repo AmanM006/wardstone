@@ -138,7 +138,7 @@ export const VercelOverview: React.FC<VercelOverviewProps> = ({
             <div>
               <div className="text-[11px] text-zinc-500 font-mono">Ingested Payment Mandates</div>
               <div className="text-3xl font-mono text-white font-light mt-1">
-                {mandates.length > 0 ? mandates.length : 14}
+                {mandates.length}
               </div>
             </div>
 
@@ -183,7 +183,7 @@ export const VercelOverview: React.FC<VercelOverviewProps> = ({
             <div>
               <div className="text-[11px] text-zinc-500 font-mono">Total Settled on Base Sepolia</div>
               <div className="text-3xl font-mono text-white font-light mt-1">
-                ${totalSettled > 0 ? totalSettled.toFixed(2) : '1,420.50'}{' '}
+                ${totalSettled.toFixed(2)}{' '}
                 <span className="text-xs text-zinc-500 font-sans">USDC</span>
               </div>
             </div>
@@ -199,7 +199,7 @@ export const VercelOverview: React.FC<VercelOverviewProps> = ({
               </div>
               <div className="flex justify-between">
                 <span>Base Sepolia Block:</span>
-                <span className="text-sky-400 font-bold">#{health?.base_sepolia?.block_number || '45615508'}</span>
+                <span className="text-sky-400 font-bold">{health?.base_sepolia?.block_number ? `#${health.base_sepolia.block_number}` : 'Pending'}</span>
               </div>
             </div>
           </div>

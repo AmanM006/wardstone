@@ -11,12 +11,16 @@ interface TraceWaterfallProps {
 export const TraceWaterfall: React.FC<TraceWaterfallProps> = ({ mandate }) => {
   const [selectedSpan, setSelectedSpan] = useState<string>('gatekeeper');
 
-  const raw: any = mandate?.raw_payload || mandate;
-  const dec: any = mandate?.governance_decision || {};
-  const risk: any = mandate?.risk_analysis || {};
-  const isHeld = mandate?.status === 'HELD' || dec.status === 'HELD' || (risk.risk_score || 0) >= 60;
-  const mandateId = mandate?.mandate_id || raw?.mandate_id || 'mandate_4c8597549e3b';
-  const agentName = mandate?.buyer_agent?.agent_name || raw?.buyer_agent?.agent_name || 'Agent Batch Processor';
+  if (!mandate) {
+    return <div className="p-8 text-center text-xs text-zinc-500">No mandate selected for tracing. Trigger a simulation to generate a Nexus execution trace.</div>;
+  }
+
+  const raw: any = mandate.raw_payload || mandate;
+  const dec: any = mandate.governance_decision || {};
+  const risk: any = mandate.risk_analysis || {};
+  const isHeld = mandate.status === 'HELD' || dec.status === 'HELD' || (risk.risk_score || 0) >= 60;
+  const mandateId = mandate.mandate_id || raw.mandate_id;
+  const agentName = mandate.buyer_agent?.agent_name || raw.buyer_agent?.agent_name || 'Agent';
 
   const spans = [
     {
@@ -29,7 +33,7 @@ export const TraceWaterfall: React.FC<TraceWaterfallProps> = ({ mandate }) => {
       input: {
         mandate_id: mandateId,
         agent_name: agentName,
-        total_amount_usdc: Number(mandate?.total_amount_usdc || raw?.total_amount_usdc || 25.0)
+        total_amount_usdc: Number(mandate.total_amount_usdc || raw.total_amount_usdc || 0)
       },
       output: {
         governance_status: isHeld ? 'QUARANTINED' : 'SETTLED',

@@ -1,11 +1,134 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 :root {
   --background: #000000;
-  --foreground: #ededed;
+  --foreground: #F0F0F0;
+  --card: #080807;
+  --border: rgba(255,255,255,0.05);
+  --green-buy: #00d4aa;
+  --red-sell: #ff4d6d;
+  --accent: #38bdf8;
+  --text-muted: rgba(255,255,255,0.4);
+  --font-plus-jakarta: 'Plus Jakarta Sans', sans-serif;
+  --font-space-mono: 'Space Mono', monospace;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+}
+
+/* All elements sharp corners on the landing page if marked .landing */
+.landing * { border-radius: 0 !important; }
+
+/* ─── Navbar ────────────────────────────────────────────── */
+.navbar-link-custom {
+  position: relative;
+  font-family: var(--font-plus-jakarta);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+  color: rgba(255,255,255,0.6);
+  padding: 8px 14px;
+  transition: color 0.25s ease;
+  overflow: hidden;
+  z-index: 1;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.navbar-link-custom::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-color: rgba(255,255,255,0.06);
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 0.5s cubic-bezier(0.16,1,0.3,1);
+}
+.navbar-link-custom:hover::before { transform: scaleX(1); transform-origin: left; }
+.navbar-link-custom:hover { color: #fff; }
+
+/* ─── g_btn (MONOLOG-style animated CTA button) ─────────── */
+.g_btn_main {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #ffffff;
+  color: #080807;
+  font-family: var(--font-space-mono);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding-left: 20px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-right: 4px;
+  height: 40px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #ffffff;
+  transition: all 0.35s cubic-bezier(0.16,1,0.3,1);
+  text-decoration: none;
+  width: fit-content;
+}
+.g_btn_text_contain {
+  overflow: hidden;
+  height: 1.2em;
+  position: relative;
+}
+.g_btn_text {
+  display: block;
+  transition: transform 0.35s cubic-bezier(0.16,1,0.3,1);
+  text-shadow: 0px 1.2em 0px #080807;
+}
+.g_btn_aside_wrap {
+  background-color: #080807;
+  aspect-ratio: 1;
+  width: 32px;
+  height: 32px;
+  margin-left: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.35s cubic-bezier(0.16,1,0.3,1);
+}
+.g_btn_aside_bg {
+  position: absolute;
+  inset: 0;
+  background-color: #080807;
+  transition: transform 0.65s cubic-bezier(0.16,1,0.35,1);
+}
+.g_btn_svg {
+  z-index: 1;
+  width: 12px;
+  height: 12px;
+  color: #ffffff;
+  position: relative;
+  transition: transform 0.65s cubic-bezier(0.16,1,0.35,1);
+}
+.g_btn_svg.is-absolute {
+  position: absolute;
+  transform: translate(-220%, 220%);
+}
+.g_btn_main:hover { opacity: 0.95; }
+.g_btn_main:hover .g_btn_text { transform: translateY(-1.2em); }
+.g_btn_main:hover .g_btn_svg { transform: translate(220%, -220%); }
+.g_btn_main:hover .g_btn_svg.is-absolute { transform: translate(0,0); }
+.g_btn_main:hover .g_btn_aside_bg { transform: scale(0.8); }
+.g_btn_main.is-large { height: 52px; padding-left: 28px; font-size: 11px; }
+.g_btn_main.is-large .g_btn_aside_wrap { width: 40px; height: 40px; }
+
+/* ─── Pulse green ───────────────────────────────────────── */
+@keyframes pulseActive {
+  0%,100% { opacity:1; box-shadow: 0 0 6px #00d4aa; }
+  50%      { opacity:0.5; box-shadow: 0 0 1px #00d4aa; }
+}
+.pulse-active {
+  animation: pulseActive 2s infinite ease-in-out;
+  background-color: #00d4aa;
 }
 
 * {
@@ -13,11 +136,8 @@
 }
 
 html, body {
-  height: 100vh;
-  width: 100vw;
   margin: 0;
   padding: 0;
-  overflow: hidden;
   background-color: #000000;
   color: #ededed;
   font-family: var(--font-sans);
@@ -26,6 +146,23 @@ html, body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   user-select: text;
+  min-height: 100%;
+}
+
+html.lenis, html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
 }
 
 /* Hide Next.js floating dev indicator badge */

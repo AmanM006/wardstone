@@ -55,13 +55,15 @@ class SettlementDecision(BaseModel):
     decision_id: str = Field(default_factory=lambda: f"dec_{uuid.uuid4().hex[:8]}")
     mandate_id: str
     agent_id: str
-    status: str = Field(description="APPROVED | HELD | REJECTED")
+    status: str = Field(description="APPROVED | HELD | REFUSED | REJECTED")
     risk_score: float
-    action_taken: str = Field(description="SETTLED_ON_CHAIN | QUARANTINED_CIRCUIT_BREAKER | ESCALATED_HUMAN")
+    action_taken: str = Field(description="SETTLED_ON_CHAIN | QUARANTINED_CIRCUIT_BREAKER | ESCALATED_HUMAN | REFUSED_MISSING_DATA")
     tx_hash: Optional[str] = Field(default=None, description="Base Sepolia transaction hash if settled")
     block_number: Optional[int] = Field(default=None)
     gas_used: Optional[int] = Field(default=None)
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    missing_data_fields: Optional[List[str]] = Field(default=None, description="Present if REFUSED due to missing data")
+    resolution_evidence_required: Optional[str] = Field(default=None, description="Present if HELD. What data is needed to resolve ambiguity")
 
 
 class ForensicIncidentReport(BaseModel):
@@ -77,3 +79,5 @@ class ForensicIncidentReport(BaseModel):
     recommended_remediation: str
     generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     status: str = Field(default="ACTIVE_HOLD", description="ACTIVE_HOLD | RESOLVED | OVERRIDDEN")
+    governance_hash: Optional[str] = None # Cryptographic Proof of Governance
+    diagram_svg: Optional[str] = None

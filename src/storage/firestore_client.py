@@ -124,6 +124,8 @@ class FirestoreClient:
             "lifetime_mandates_count": 0,
             "lifetime_settled_volume_usdc": 0.0,
             "lifetime_quarantined_count": 0,
+            "lifetime_settled_count": 0,
+            "lifetime_refused_count": 0,
             "last_heartbeat_time": now_iso
         }
         if self.db:
@@ -131,13 +133,31 @@ class FirestoreClient:
                 doc = self.db.collection("system_telemetry").document("fleet_uptime").get()
                 if doc.exists:
                     data = doc.to_dict()
+                    for k, v in default_telemetry.items():
+                        if k not in data:
+                            data[k] = v
                     return data
                 else:
                     try:
-                        mandates_count = len(list(self.db.collection("mandates").stream()))
-                        incidents_count = len(list(self.db.collection("incidents").stream()))
+                        mandates = list(self.db.collection("mandates").stream())
+                        mandates_count = len(mandates)
+                        
+                        settled = 0
+                        refused = 0
+                        held = 0
+                        for m in mandates:
+                            m_dict = m.to_dict()
+                            if m_dict.get("status") == "APPROVED":
+                                settled += 1
+                            elif m_dict.get("status") == "REFUSED":
+                                refused += 1
+                            elif m_dict.get("status") == "HELD":
+                                held += 1
+
                         default_telemetry["lifetime_mandates_count"] = mandates_count
-                        default_telemetry["lifetime_quarantined_count"] = incidents_count
+                        default_telemetry["lifetime_quarantined_count"] = held
+                        default_telemetry["lifetime_settled_count"] = settled
+                        default_telemetry["lifetime_refused_count"] = refused
                     except Exception:
                         pass
                     self.db.collection("system_telemetry").document("fleet_uptime").set(default_telemetry)
@@ -149,11 +169,13 @@ class FirestoreClient:
             self._local_store["system_telemetry"]["fleet_uptime"] = default_telemetry
         return self._local_store["system_telemetry"]["fleet_uptime"]
 
-    def update_telemetry(self, mandates_delta: int = 0, volume_delta: float = 0.0, quarantined_delta: int = 0) -> Dict[str, Any]:
+    def update_telemetry(self, mandates_delta: int = 0, volume_delta: float = 0.0, quarantined_delta: int = 0, settled_delta: int = 0, refused_delta: int = 0) -> Dict[str, Any]:
         telemetry = self.get_or_init_telemetry()
         telemetry["lifetime_mandates_count"] = telemetry.get("lifetime_mandates_count", 0) + mandates_delta
         telemetry["lifetime_settled_volume_usdc"] = round(telemetry.get("lifetime_settled_volume_usdc", 0.0) + volume_delta, 2)
         telemetry["lifetime_quarantined_count"] = telemetry.get("lifetime_quarantined_count", 0) + quarantined_delta
+        telemetry["lifetime_settled_count"] = telemetry.get("lifetime_settled_count", 0) + settled_delta
+        telemetry["lifetime_refused_count"] = telemetry.get("lifetime_refused_count", 0) + refused_delta
         telemetry["last_heartbeat_time"] = datetime.now(timezone.utc).isoformat()
 
         if self.db:

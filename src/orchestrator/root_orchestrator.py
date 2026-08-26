@@ -20,6 +20,7 @@ from src.agents.forecaster import forecaster_agent
 from src.agents.gatekeeper import gatekeeper_agent
 from src.agents.forensics import forensics_agent
 from src.orchestrator.recovery import recovery_manager
+from src.storage.firestore_client import firestore_client
 
 
 class RootOrchestrator:
@@ -43,6 +44,18 @@ class RootOrchestrator:
                 "success": False,
                 "stage": "WATCHER",
                 "error": msg,
+                "decision": None,
+                "incident": None
+            }
+            
+        # Pillar 2: Pre-Execution IAM Kill Switch verification
+        from src.storage.memory_bank import memory_bank
+        profile = memory_bank.profiles.get(mandate.buyer_agent.agent_id)
+        if profile and profile.agent_status == "REVOKED":
+            return {
+                "success": False,
+                "stage": "API_GATEWAY",
+                "error": "HTTP 403 Forbidden: Agent identity has been cryptographically revoked due to past violations.",
                 "decision": None,
                 "incident": None
             }
@@ -82,11 +95,15 @@ class RootOrchestrator:
             # Step 5: Update persistent telemetry counters in Firestore
             vol_delta = mandate.total_amount_usdc if decision.status == "APPROVED" else 0.0
             quarantined_delta = 1 if decision.status == "HELD" else 0
-            from src.storage.firestore_client import firestore_client
+            settled_delta = 1 if decision.status == "APPROVED" else 0
+            refused_delta = 1 if decision.status == "REFUSED" else 0
+            
             firestore_client.update_telemetry(
                 mandates_delta=1,
                 volume_delta=vol_delta,
-                quarantined_delta=quarantined_delta
+                quarantined_delta=quarantined_delta,
+                settled_delta=settled_delta,
+                refused_delta=refused_delta
             )
 
             end_time = datetime.now(timezone.utc)

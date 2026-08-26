@@ -51,9 +51,7 @@ export const VercelSidebar: React.FC<VercelSidebarProps> = ({
   const [selectedEnv, setSelectedEnv] = useState('Base Sepolia Live');
 
   const envs = [
-    { id: 'base-sepolia', name: 'wardstone-ap2', tag: 'Base Sepolia Live', active: true },
-    { id: 'gcp-staging', name: 'wardstone-staging', tag: 'Cloud Run Staging', active: false },
-    { id: 'local-sandbox', name: 'wardstone-sandbox', tag: 'ADK Local Dev', active: false }
+    { id: 'base-sepolia', name: 'wardstone-ap2', tag: 'Base Sepolia Live', active: true }
   ];
 
   const navItems = [

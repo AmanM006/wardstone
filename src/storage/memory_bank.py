@@ -19,16 +19,20 @@ class AgentSpendProfile:
         baseline_hourly_velocity: float = 25.0, # Normal average spend per hour
         max_single_mandate: float = 50.0,
         historical_mandates_count: int = 0,
+        historical_rejected_count: int = 0,
         total_settled_usdc: float = 0.0,
-        reputation_score: float = 95.0
+        reputation_score: float = 95.0,
+        agent_status: str = "ACTIVE"
     ):
         self.agent_id = agent_id
         self.agent_name = agent_name
         self.baseline_hourly_velocity = baseline_hourly_velocity
         self.max_single_mandate = max_single_mandate
         self.historical_mandates_count = historical_mandates_count
+        self.historical_rejected_count = historical_rejected_count
         self.total_settled_usdc = total_settled_usdc
         self.reputation_score = reputation_score
+        self.agent_status = agent_status
         self.recent_transactions: List[Dict[str, Any]] = []
 
     def to_dict(self) -> Dict[str, Any]:
@@ -38,8 +42,10 @@ class AgentSpendProfile:
             "baseline_hourly_velocity": self.baseline_hourly_velocity,
             "max_single_mandate": self.max_single_mandate,
             "historical_mandates_count": self.historical_mandates_count,
+            "historical_rejected_count": self.historical_rejected_count,
             "total_settled_usdc": self.total_settled_usdc,
             "reputation_score": self.reputation_score,
+            "agent_status": self.agent_status,
             "recent_transactions": self.recent_transactions[-30:]
         }
 
@@ -51,8 +57,10 @@ class AgentSpendProfile:
             baseline_hourly_velocity=data.get("baseline_hourly_velocity", 25.0),
             max_single_mandate=data.get("max_single_mandate", 50.0),
             historical_mandates_count=data.get("historical_mandates_count", 0),
+            historical_rejected_count=data.get("historical_rejected_count", 0),
             total_settled_usdc=data.get("total_settled_usdc", 0.0),
-            reputation_score=data.get("reputation_score", 95.0)
+            reputation_score=data.get("reputation_score", 95.0),
+            agent_status=data.get("agent_status", "ACTIVE")
         )
         profile.recent_transactions = data.get("recent_transactions", [])
         return profile
@@ -110,6 +118,27 @@ class MemoryBank:
                 "amount_usdc": mandate.total_amount_usdc,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "tx_hash": tx_hash
+            })
+        profile.recent_transactions = profile.recent_transactions[-50:]
+        firestore_client.save_agent_profile(profile.agent_id, profile.to_dict())
+
+    def record_rejected_mandate(self, mandate: AP2PaymentMandate):
+        profile = self.get_or_create_profile(mandate.buyer_agent)
+        profile.historical_rejected_count += 1
+        
+        # Update existing record with tx_hash if present (set to failed or None)
+        updated = False
+        for tx in reversed(profile.recent_transactions):
+            if tx.get("mandate_id") == mandate.mandate_id:
+                tx["tx_hash"] = "FAILED"
+                updated = True
+                break
+        if not updated:
+            profile.recent_transactions.append({
+                "mandate_id": mandate.mandate_id,
+                "amount_usdc": mandate.total_amount_usdc,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "tx_hash": "FAILED"
             })
         profile.recent_transactions = profile.recent_transactions[-50:]
         firestore_client.save_agent_profile(profile.agent_id, profile.to_dict())

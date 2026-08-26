@@ -158,6 +158,60 @@ async def get_incidents(limit: int = 50):
     }
 
 
+class OverrideRequest(BaseModel):
+    incident_id: str
+    mandate_id: str
+    action: str # "FORCE_APPROVE" | "CONFIRM_BAN"
+
+@app.post("/api/v1/incidents/override")
+async def override_incident(req: OverrideRequest):
+    """Pillar 3: Human-in-the-Loop Override"""
+    incident = firestore_client.db.collection("incidents").document(req.incident_id).get()
+    if not incident.exists:
+        raise HTTPException(status_code=404, detail="Incident not found")
+        
+    inc_data = incident.to_dict()
+    agent_id = inc_data.get("agent_id")
+    
+    if req.action == "CONFIRM_BAN":
+        if agent_id:
+            profile = memory_bank.profiles.get(agent_id)
+            if profile:
+                profile.agent_status = "REVOKED"
+                firestore_client.save_agent_profile(profile.agent_id, profile.to_dict())
+        inc_data["status"] = "HUMAN_BANNED"
+        firestore_client.save_incident(req.incident_id, inc_data)
+        return {"status": "success", "message": f"Agent {agent_id} banned permanently."}
+        
+    elif req.action == "FORCE_APPROVE":
+        # 1. Update incident status
+        inc_data["status"] = "HUMAN_OVERRIDE_APPROVED"
+        firestore_client.save_incident(req.incident_id, inc_data)
+        
+        # 2. Update agent profile to learn from false positive
+        if agent_id:
+            profile = memory_bank.profiles.get(agent_id)
+            if profile:
+                profile.agent_status = "ACTIVE"
+                # Artificially increase their baseline to adapt to the false positive
+                profile.baseline_hourly_velocity *= 1.25
+                profile.historical_mandates_count += 1
+                firestore_client.save_agent_profile(profile.agent_id, profile.to_dict())
+                
+        # 3. We would trigger real x402 settlement here in a real scenario
+        # but for hackathon scope, we just record it.
+        firestore_client.update_telemetry(
+            mandates_delta=0,
+            volume_delta=float(inc_data.get("attempted_amount_usdc", 0.0)),
+            quarantined_delta=-1,
+            settled_delta=1,
+            refused_delta=0
+        )
+        return {"status": "success", "message": "Incident manually approved. Fleet telemetry updated."}
+        
+    raise HTTPException(status_code=400, detail="Invalid action")
+
+
 @app.get("/api/v1/a2a/agent-card")
 async def get_a2a_agent_card():
     card_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "protocols", "a2a_agent_card.json"))
