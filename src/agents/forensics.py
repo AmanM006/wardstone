@@ -30,7 +30,7 @@ except ImportError:
 class ForensicsAgent:
     def __init__(self, name: str = "ForensicsAgent"):
         self.name = name
-        self.model_name = settings.gemini_model or "gemini-2.5-flash-lite"
+        self.model_name = settings.gemini_model or "gemini-3.5-flash-lite"
         self.client = None
         self._init_gemini()
 
@@ -107,7 +107,7 @@ Respond strictly with valid JSON.
         start_time = time.perf_counter()
         
         # Prioritize compliant Gemini 3.5 series with resilient cascade fallbacks
-        models_to_try = [self.model_name, "gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-2.5-flash"]
+        models_to_try = [self.model_name, "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.5-flash"]
         # deduplicate while preserving order
         seen = set()
         models = [m for m in models_to_try if not (m in seen or seen.add(m))]
