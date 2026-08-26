@@ -309,7 +309,8 @@ async def simulate_policy(req: PolicySimulationRequest):
     
     for doc in historical_mandates:
         mandate_id = doc.get("mandate_id")
-        score = doc.get("risk_score", 0.0)
+        risk_analysis = doc.get("risk_analysis", {})
+        score = risk_analysis.get("risk_score", 0.0)
         
         was_held = mandate_id in held_mandate_ids
         would_be_held = score >= req.new_threshold
