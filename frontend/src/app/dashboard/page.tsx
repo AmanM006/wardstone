@@ -11,6 +11,7 @@ import { NexusTopologyMap } from '@/components/NexusTopologyMap';
 import { TraceWaterfall } from '@/components/TraceWaterfall';
 import { PreClearanceModal } from '@/components/PreClearanceModal';
 import { AgentCardModal } from '@/components/AgentCardModal';
+import { SkeletonDashboard } from '@/components/SkeletonDashboard';
 import { TopologyModal } from '@/components/TopologyModal';
 import { FleetDetailModal } from '@/components/FleetDetailModal';
 import { FleetOnboardingModal } from '@/components/FleetOnboardingModal';
@@ -39,10 +40,10 @@ export default function DashboardPage() {
   const [incidents, setIncidents] = useState<ForensicIncidentReport[]>([]);
   const [agentCard, setAgentCard] = useState<any>(null);
 
-  // Navigation State with URL routing support
   const [activeTab, setActiveTab] = useState<string>('OVERVIEW');
   const [searchTerm, setSearchTerm] = useState('');
   const [loadingScenario, setLoadingScenario] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Selected items for Modals & Drawers
   const [selectedMandate, setSelectedMandate] = useState<AP2PaymentMandate | null>(null);
@@ -116,8 +117,10 @@ export default function DashboardPage() {
         }
       }
       if (inc) setIncidents(inc);
+      setIsLoading(false);
     } catch (err) {
       console.error('Error updating live telemetry:', err);
+      setIsLoading(false);
     }
   }, [selectedMandate]);
 
@@ -169,6 +172,10 @@ export default function DashboardPage() {
   const handleAddAgent = (newAgent: AgentSpendProfile) => {
     setAgents([...agents, newAgent]);
   };
+
+  if (isLoading) {
+    return <SkeletonDashboard />;
+  }
 
   return (
     <div className="h-screen w-screen bg-[#000000] text-[#ededed] flex overflow-hidden font-sans select-text">
