@@ -40,17 +40,21 @@ class ImagenDiagramGenerator:
         bg_image_data = ""
         if self.client:
             try:
-                # Actual Imagen 3 call
+                # Actual Gemini 2.5 Flash Image call
                 result = self.client.models.generate_content(
-                    model='imagen-3.0-generate-001',
+                    model='gemini-2.5-flash-image',
                     contents='A dark, futuristic cyber security grid background, abstract, tech noir, glowing blue nodes, very dark slate blue palette'
                 )
-                if result.generated_images:
-                    img_bytes = result.generated_images[0].image.image_bytes
-                    b64 = base64.b64encode(img_bytes).decode('utf-8')
-                    bg_image_data = f'<image href="data:image/png;base64,{b64}" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" opacity="0.4" />'
+                if hasattr(result, 'candidates') and result.candidates:
+                    parts = result.candidates[0].content.parts
+                    for p in parts:
+                        if hasattr(p, 'inline_data') and p.inline_data:
+                            img_bytes = p.inline_data.data
+                            b64 = base64.b64encode(img_bytes).decode('utf-8')
+                            bg_image_data = f'<image href="data:image/png;base64,{b64}" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" opacity="0.4" />'
+                            break
             except Exception as e:
-                print(f"Imagen 3 API Error (Using fallback background): {e}")
+                print(f"Image API Error (Using fallback background): {e}")
 
         # Fallback grid if Imagen fails
         fallback_bg = """
