@@ -146,9 +146,9 @@ export const DatadogIncidentPanel: React.FC<DatadogIncidentPanelProps> = ({
   // Reset ack when switching mandates
   useEffect(() => { setAcknowledged(false); }, [selectedMandate?.mandate_id]);
 
-  // Find matching incident by mandate ID, don't fall back to incidents[0]
+  // Find matching incident by mandate ID
   const matchingIncident = selectedMandate
-    ? incidents.find(inc => inc.mandate_id === selectedMandate.mandate_id) || null
+    ? incidents.find(inc => inc.mandate_id === (selectedMandate.mandate_id || (selectedMandate as any).raw_payload?.mandate_id)) || null
     : null;
 
   const raw: any = selectedMandate?.raw_payload || selectedMandate;
@@ -173,11 +173,12 @@ export const DatadogIncidentPanel: React.FC<DatadogIncidentPanelProps> = ({
   };
 
   // Generate unique hash per mandate
-  const proofHash = selectedMandate?.mandate_id
-    ? Array.from(selectedMandate.mandate_id + (dec.tx_hash || '')).reduce(
+  const mandateId = selectedMandate?.mandate_id || raw?.mandate_id;
+  const proofHash = mandateId
+    ? Array.from(mandateId + (dec.tx_hash || '')).reduce(
         (hash, ch) => ((hash << 5) - hash + ch.charCodeAt(0)) | 0, 0
-      ).toString(16).padStart(64, '0').replace('-', '9') + selectedMandate.mandate_id.slice(-16)
-    : null;
+      ).toString(16).padStart(64, '0')
+    : '0'.repeat(64);
 
   const mandateCreatedAt = selectedMandate?.created_at as string | undefined;
   const incidentTimestamp = (matchingIncident as any)?.created_at || (matchingIncident as any)?.timestamp || mandateCreatedAt;
