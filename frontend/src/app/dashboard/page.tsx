@@ -259,7 +259,7 @@ export default function DashboardPage() {
               <div className="text-xs font-mono uppercase tracking-wider text-zinc-400">
                 Predictive Blast-Radius Radar & Spend Velocity Waves
               </div>
-              <VelocityRiskChart mandates={mandates} />
+              <VelocityRiskChart mandates={mandates} incidents={incidents} />
               <NexusTopologyMap />
             </div>
           </div>

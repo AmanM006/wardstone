@@ -1,22 +1,39 @@
 'use client';
 
 import React from 'react';
-import { AP2PaymentMandate } from '@/types';
+import { AP2PaymentMandate, ForensicIncidentReport } from '@/types';
 
 interface VelocityRiskChartProps {
   mandates: AP2PaymentMandate[];
+  incidents: ForensicIncidentReport[];
 }
 
-export const VelocityRiskChart: React.FC<VelocityRiskChartProps> = ({ mandates }) => {
-  const highRiskCount = mandates.filter((m) => (m.risk_analysis?.risk_score || 0) >= 60).length;
+export const VelocityRiskChart: React.FC<VelocityRiskChartProps> = ({ mandates, incidents }) => {
+  // Build a lookup map: mandate_id -> incident (for risk scores)
+  const incidentMap = new Map<string, ForensicIncidentReport>();
+  incidents.forEach(inc => incidentMap.set(inc.mandate_id, inc));
+
+  // A mandate is high-risk if its incident has risk_score >= 60
+  const highRiskCount = mandates.filter((m) => {
+    const r: any = m.raw_payload || m;
+    const mandateId = m.mandate_id || r.mandate_id;
+    const inc = incidentMap.get(mandateId);
+    const score = inc?.risk_score ?? m.risk_analysis?.risk_score ?? 0;
+    return score >= 60;
+  }).length;
+
   const highRiskPct = mandates.length > 0 ? ((highRiskCount / mandates.length) * 100).toFixed(1) : '0.0';
 
+  // A mandate settled if it has NO incident (passed the circuit breaker)
   let totalSettled = 0;
   mandates.forEach((m) => {
-    const score = m.risk_analysis?.risk_score || 0;
-    const isApproved = m.status === 'APPROVED' || m.governance_decision?.status === 'APPROVED' || (score > 0 && score < 60);
-    if (isApproved) {
-      totalSettled += Number(m.total_amount_usdc || (m as any).raw_payload?.total_amount_usdc || 0);
+    const r: any = m.raw_payload || m;
+    const mandateId = m.mandate_id || r.mandate_id;
+    const hasIncident = incidentMap.has(mandateId);
+    const score = incidentMap.get(mandateId)?.risk_score ?? m.risk_analysis?.risk_score ?? 0;
+    const isSettled = !hasIncident || (score > 0 && score < 60);
+    if (isSettled) {
+      totalSettled += Number(m.total_amount_usdc || r.total_amount_usdc || 0);
     }
   });
 
