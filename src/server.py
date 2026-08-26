@@ -474,4 +474,35 @@ async def trigger_simulation(req: SimulationRequest):
             simulate_forecaster_failure=True
         )
 
-    raise HTTPException(status_code=400, detail="Unknown simulation scenario")
+from fastapi.responses import Response
+
+class TTSRequest(BaseModel):
+    text: str
+
+@app.post("/api/v1/tts")
+async def generate_tts(req: TTSRequest):
+    try:
+        from google.cloud import texttospeech
+        import os
+        
+        # Reset credentials if needed, or rely on ADC
+        if "GOOGLE_APPLICATION_CREDENTIALS" in os.environ and not os.path.exists(os.environ["GOOGLE_APPLICATION_CREDENTIALS"]):
+            os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS")
+            
+        client = texttospeech.TextToSpeechClient()
+        input_text = texttospeech.SynthesisInput(text=req.text)
+        voice = texttospeech.VoiceSelectionParams(
+            language_code="en-US",
+            name="en-US-Journey-O" # A nice premium voice
+        )
+        audio_config = texttospeech.AudioConfig(
+            audio_encoding=texttospeech.AudioEncoding.MP3
+        )
+        response = client.synthesize_speech(
+            input=input_text, voice=voice, audio_config=audio_config
+        )
+        return Response(content=response.audio_content, media_type="audio/mpeg")
+    except Exception as e:
+        print(f"TTS Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+

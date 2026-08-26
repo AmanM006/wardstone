@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Lenis from 'lenis';
 import { AP2PaymentMandate, ForensicIncidentReport } from '@/types';
 import { overrideIncident } from '@/lib/api';
+import { playCloudTTS } from '../lib/tts';
 import { CheckCircle2, Volume2, Network, Flame, Send, MessageSquare, ExternalLink, ShieldCheck, ShieldAlert, ChevronRight } from 'lucide-react';
 
 interface DatadogIncidentPanelProps {
@@ -65,12 +66,9 @@ export const DatadogIncidentPanel: React.FC<DatadogIncidentPanelProps> = ({
   const amount = Number(selectedMandate?.total_amount_usdc || raw?.total_amount_usdc || 0);
 
   const handlePlayAudio = () => {
-    if ('speechSynthesis' in window && matchingIncident) {
-      window.speechSynthesis.cancel();
+    if (matchingIncident) {
       const text = `Alert: Wardstone Circuit Breaker has quarantined an anomalous payment mandate from agent ${matchingIncident.agent_name}. Attempted spend: ${matchingIncident.attempted_amount_usdc} USDC. Risk score: ${matchingIncident.risk_score} out of 100. Base Sepolia settlement halted.`;
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1.05;
-      window.speechSynthesis.speak(utterance);
+      playCloudTTS(text);
     }
   };
 

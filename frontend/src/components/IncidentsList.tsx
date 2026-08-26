@@ -3,6 +3,7 @@
 import React from 'react';
 import { ForensicIncidentReport } from '@/types';
 import { ShieldAlert, Eye, Volume2 } from 'lucide-react';
+import { playCloudTTS } from '../lib/tts';
 
 interface IncidentsListProps {
   incidents: ForensicIncidentReport[];
@@ -15,13 +16,8 @@ export const IncidentsList: React.FC<IncidentsListProps> = ({
 }) => {
   const handlePlayAudio = (inc: ForensicIncidentReport, e: React.MouseEvent) => {
     e.stopPropagation();
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const text = `Alert: Wardstone Circuit Breaker quarantined mandate from ${inc.agent_name}. Attempted spend: ${inc.attempted_amount_usdc} USDC. Risk score: ${inc.risk_score} out of 100.`;
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1.05;
-      window.speechSynthesis.speak(utterance);
-    }
+    const text = `Alert: Wardstone Circuit Breaker quarantined mandate from ${inc.agent_name}. Attempted spend: ${inc.attempted_amount_usdc} USDC. Risk score: ${inc.risk_score} out of 100.`;
+    playCloudTTS(text);
   };
 
   return (

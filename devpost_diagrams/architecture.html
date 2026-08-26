@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+</head>
+<body>
+    <pre class="mermaid">
+    graph TD
+        subgraph "External Multi-Agent Ecosystem"
+            EXT["External Buyer Agent<br/>(Requests Micro-Service / Compute)"]
+            AC_EXT["A2A Pre-Clearance Query<br/>(Queries Gatekeeper Agent Card)"]
+        end
+    
+        subgraph "Google Cloud Ingestion Layer"
+            PS["Cloud Pub/Sub: mandate-events<br/>(Intent, Cart, AP2 Payment Mandate)"]
+        end
+    
+        subgraph "Wardstone Multi-Agent Governance Fleet (Google ADK)"
+            ORCH["Root Orchestrator<br/>(Supervises State Machine & Failure Recovery)"]
+            WATCH["1. Watcher Agent<br/>(Normalizes Mandates)"]
+            FORE["2. Forecaster Agent<br/>(Memory Bank History & Collusion Detection & 0-100 Blast Risk)"]
+            GATE["3. Gatekeeper Agent<br/>(Threshold Policy & A2A Agent Card)"]
+            FOREN["4. Forensics Agent (Gemini 3.5 Flash)<br/>(Causal Postmortem & Inst. Memory Scribe)"]
+            MB[("Agent Engine Memory Bank<br/>Spend Baselines & Profiles")]
+        end
+    
+        subgraph "Official Settlement Rail"
+            X402["Official AP2 Facilitator<br/>(EVM Sepolia Settlement)"]
+            TX[("Ethereum Sepolia Blockchain<br/>Live Verifiable Tx Hash")]
+            BLOCK["Circuit Breaker Quarantined<br/>(Zero Funds / No On-Chain Tx)"]
+        end
+    
+        EXT -->|"Emits Payment Mandate"| PS
+        EXT <-->|"Queries Pre-Clearance"| AC_EXT
+        AC_EXT <--> GATE
+    
+        PS --> WATCH
+        ORCH --> WATCH
+        ORCH --> FORE
+        ORCH --> GATE
+        ORCH --> FOREN
+    
+        WATCH --> FORE
+        FORE <--> MB
+        FORE -->|"Risk Score"| GATE
+    
+        GATE -->|"Low Risk (Score < 60)"| X402
+        X402 --> TX
+        GATE -->|"High Risk (Score >= 60)"| BLOCK
+    </pre>
+</body>
+</html>

@@ -1,12 +1,28 @@
 """
 Bonus Model 2: Imagen 3 Blast-Radius Topological Diagram Generator
-Constructs topological risk and blast-radius visual graphs for incident postmortems.
+Constructs topological risk and blast-radius visual graphs for incident postmortems using Real Imagen 3 generated backgrounds.
 """
 
 from typing import Dict, Any
+import base64
+import os
 
+try:
+    from google import genai
+    HAS_GENAI = True
+except ImportError:
+    HAS_GENAI = False
 
 class ImagenDiagramGenerator:
+    def __init__(self):
+        self.client = None
+        if HAS_GENAI:
+            # We must use ADC for Vertex AI
+            try:
+                self.client = genai.Client(vertexai=True, project="agent-505917", location="us-central1")
+            except Exception as e:
+                print(f"Failed to init Vertex Imagen client: {e}")
+
     def generate_blast_radius_svg(
         self,
         agent_name: str,
@@ -16,18 +32,41 @@ class ImagenDiagramGenerator:
     ) -> str:
         """
         Generates clean visual SVG blast-radius topology diagram for embedding in postmortems.
+        Uses Imagen 3 for the background art.
         """
         color = "#ef4444" if risk_score >= 60 else "#10b981"
         status_text = "QUARANTINED" if risk_score >= 60 else "APPROVED"
 
+        bg_image_data = ""
+        if self.client:
+            try:
+                # Actual Imagen 3 call
+                result = self.client.models.generate_content(
+                    model='imagen-3.0-generate-001',
+                    contents='A dark, futuristic cyber security grid background, abstract, tech noir, glowing blue nodes, very dark slate blue palette'
+                )
+                if result.generated_images:
+                    img_bytes = result.generated_images[0].image.image_bytes
+                    b64 = base64.b64encode(img_bytes).decode('utf-8')
+                    bg_image_data = f'<image href="data:image/png;base64,{b64}" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" opacity="0.4" />'
+            except Exception as e:
+                print(f"Imagen 3 API Error (Using fallback background): {e}")
+
+        # Fallback grid if Imagen fails
+        fallback_bg = """
+        <defs>
+          <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#1e293b" stroke-width="1"/>
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#grid)" />
+        """
+        
+        actual_bg = bg_image_data if bg_image_data else fallback_bg
+
         svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 240" width="100%" height="200" style="background:#0f172a; border-radius:8px; font-family:sans-serif;">
-  <!-- Grid Background -->
-  <defs>
-    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#1e293b" stroke-width="1"/>
-    </pattern>
-  </defs>
-  <rect width="100%" height="100%" fill="url(#grid)" />
+  <!-- Imagen 3 Generated Background -->
+  {actual_bg}
 
   <!-- Node 1: Buyer Agent -->
   <circle cx="90" cy="120" r="35" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
@@ -53,9 +92,10 @@ class ImagenDiagramGenerator:
 
   <!-- Header Info -->
   <text x="20" y="30" fill="#f8fafc" font-size="12" font-weight="bold">BLAST-RADIUS TOPOLOGY MAP (Imagen 3 Visualizer)</text>
-  <text x="20" y="48" fill="#94a3b8" font-size="9">Velocity Variance: {variance_ratio:.1f}x baseline • Risk Threshold: 60.0</text>
+  <text x="20" y="48" fill="#94a3b8" font-size="9">Velocity Variance: {variance_ratio:.1f}x baseline | Risk Threshold: 60.0</text>
 </svg>"""
         return svg
 
 
 imagen_generator = ImagenDiagramGenerator()
+

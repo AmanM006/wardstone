@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { ForensicIncidentReport } from '@/types';
 import { ShieldAlert, Volume2, CheckCircle2, MessageSquare, Send, X, Network, Flame, Lock } from 'lucide-react';
+import { playCloudTTS } from '../lib/tts';
 
 interface IncidentCommanderDrawerProps {
   incident: ForensicIncidentReport | null;
@@ -32,13 +33,8 @@ export const IncidentCommanderDrawer: React.FC<IncidentCommanderDrawerProps> = (
   };
 
   const handlePlayAudio = () => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const text = `Alert: Wardstone Circuit Breaker has quarantined an anomalous payment mandate from agent ${incident.agent_name}. Attempted spend: ${incident.attempted_amount_usdc} USDC. Risk score: ${incident.risk_score} out of 100. On-chain settlement halted.`;
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1.05;
-      window.speechSynthesis.speak(utterance);
-    }
+    const text = `Alert: Wardstone Circuit Breaker has quarantined an anomalous payment mandate from agent ${incident.agent_name}. Attempted spend: ${incident.attempted_amount_usdc} USDC. Risk score: ${incident.risk_score} out of 100. On-chain settlement halted.`;
+    playCloudTTS(text);
   };
 
   return (
