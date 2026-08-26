@@ -77,7 +77,7 @@ class GatekeeperAgent:
         - If score >= 60: trips Circuit Breaker, locks transaction (HELD), forwards to Forensics.
         """
         # Bonus: Edge Pre-Screen via Gemma 4
-        is_clean, threats = gemma_prescreen.scan_mandate_metadata(mandate.metadata)
+        is_clean, threats = gemma_prescreen.scan_mandate_metadata(mandate.context_metadata)
         if not is_clean:
             print(f"[{self.name}] [REFUSED] Gemma Pre-Screen blocked payload: {threats}")
             decision = SettlementDecision(
