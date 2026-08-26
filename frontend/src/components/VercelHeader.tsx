@@ -36,28 +36,34 @@ export const VercelHeader: React.FC<VercelHeaderProps> = ({
         <button
           disabled={loadingScenario !== null}
           onClick={() => onTriggerSimulation('normal_indexer')}
-          className="px-2.5 py-1 bg-[#0a0a0a] hover:bg-[#141414] active:scale-[0.98] text-zinc-300 border border-[#222222] hover:border-[#333333] rounded text-[11px] font-medium transition flex items-center gap-1.5 disabled:opacity-40"
+          className={`px-2.5 py-1 bg-[#0a0a0a] hover:bg-[#141414] active:scale-[0.98] text-zinc-300 border border-[#222222] hover:border-[#333333] rounded text-[11px] font-medium transition flex items-center gap-1.5 disabled:opacity-40 ${loadingScenario === 'normal_indexer' ? 'border-emerald-700 text-emerald-300' : ''}`}
         >
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-          <span>Normal ($2.50)</span>
+          {loadingScenario === 'normal_indexer'
+            ? <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+            : <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+          <span>{loadingScenario === 'normal_indexer' ? 'Processing...' : 'Normal ($2.50)'}</span>
         </button>
 
         <button
           disabled={loadingScenario !== null}
           onClick={() => onTriggerSimulation('batch_compute')}
-          className="px-2.5 py-1 bg-[#0a0a0a] hover:bg-[#141414] active:scale-[0.98] text-zinc-300 border border-[#222222] hover:border-[#333333] rounded text-[11px] font-medium transition flex items-center gap-1.5 disabled:opacity-40"
+          className={`px-2.5 py-1 bg-[#0a0a0a] hover:bg-[#141414] active:scale-[0.98] text-zinc-300 border border-[#222222] hover:border-[#333333] rounded text-[11px] font-medium transition flex items-center gap-1.5 disabled:opacity-40 ${loadingScenario === 'batch_compute' ? 'border-amber-700 text-amber-300' : ''}`}
         >
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-          <span>Batch ($25.00)</span>
+          {loadingScenario === 'batch_compute'
+            ? <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+            : <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
+          <span>{loadingScenario === 'batch_compute' ? 'Processing...' : 'Batch ($25.00)'}</span>
         </button>
 
         <button
           disabled={loadingScenario !== null}
           onClick={() => onTriggerSimulation('runaway_rogue')}
-          className="px-2.5 py-1 bg-[#140606] hover:bg-[#200909] active:scale-[0.98] text-rose-300 border border-rose-900/60 hover:border-rose-800 rounded text-[11px] font-medium transition flex items-center gap-1.5 disabled:opacity-40"
+          className={`px-2.5 py-1 bg-[#140606] hover:bg-[#200909] active:scale-[0.98] text-rose-300 border border-rose-900/60 hover:border-rose-800 rounded text-[11px] font-medium transition flex items-center gap-1.5 disabled:opacity-40 ${loadingScenario === 'runaway_rogue' ? 'border-rose-600 text-rose-200' : ''}`}
         >
-          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-          <span>Rogue Runaway ($220.00)</span>
+          {loadingScenario === 'runaway_rogue'
+            ? <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+            : <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />}
+          <span>{loadingScenario === 'runaway_rogue' ? 'Processing...' : 'Rogue Runaway ($220.00)'}</span>
         </button>
 
         <button
@@ -66,7 +72,7 @@ export const VercelHeader: React.FC<VercelHeaderProps> = ({
           className="px-2.5 py-1 bg-[#0a0a0a] hover:bg-[#141414] active:scale-[0.98] text-zinc-400 hover:text-zinc-200 border border-[#222222] hover:border-[#333333] rounded text-[11px] font-medium transition flex items-center gap-1.5 disabled:opacity-40"
         >
           <RefreshCw className={`w-3 h-3 text-zinc-400 ${loadingScenario === 'worker_failure' ? 'animate-spin text-sky-400' : ''}`} />
-          <span>Inject Crash</span>
+          <span>{loadingScenario === 'worker_failure' ? 'Processing...' : 'Inject Crash'}</span>
         </button>
       </div>
 

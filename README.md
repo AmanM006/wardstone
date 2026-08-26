@@ -1,179 +1,126 @@
 # Wardstone AP2: Zero-Trust Agent Fleet Gatekeeper
 
 > **Live Dashboard**: [https://wardstone-ap2.vercel.app](https://wardstone-ap2.vercel.app)  
-> **Live Backend API (Cloud Run)**: [https://wardstone-ap2-900526798908.us-central1.run.app/api/v1/health](https://wardstone-ap2-900526798908.us-central1.run.app/api/v1/health)  
-> **Verified On-Chain Tx**: [Etherscan Tx `0x07e58acc...`](https://sepolia.etherscan.io/tx/0x07e58acc8c57fd85759b7a770f198e5b8874cda85a8fb658fae0ec0d94886e10)
+> **Live Backend API (Cloud Run)**: [https://wardstone-ap2-900526798908.us-central1.run.app/api/v1/health](https://wardstone-ap2-900526798908.us-central1.run.app/api/v1/health)
 
 ---
 
-## 1. The Unlikely Hero & Problem Statement
+## What is Wardstone?
 
-### The Persona: **The AI Agent Fleet Controller**
-In the emerging agentic economy, autonomous AI agents procure compute, hire sub-agents, and execute micro-transactions without human supervision using **Google & Coinbase's AP2 / on-chain micropayment protocol**. 
+Wardstone is a **real-time, zero-trust governance firewall** for autonomous AI agent payment fleets. As AI agents begin independently executing high-value financial transactions (via AP2 / x402 payment protocols on Base Sepolia), Wardstone intercepts, evaluates, and either approves or quarantines every mandate before any funds settle on-chain.
 
-However, organizations face a critical operational nightmare:
-* **Runaway Spend Loops**: An unsupervised agent encountering an unhandled prompt loop can burn hundreds of dollars in micro-transactions within minutes.
-* **Cross-Agent Sybil Collusion**: Multiple rogue agents can smurf funds into a single destination wallet, bypassing standard per-agent limits.
-* **Lack of Predictive Interventions**: Existing API gateways only enforce *static post-facto spend caps* or log traces after money has already left the wallet.
-
-**Wardstone AP2** is the active control plane built for the **AI Agent Fleet Controller** — an autonomous multi-agent governance system that predicts blast-radius risk, detects cross-agent collusion, auto-approves safe payments, quarantines rogue mandates before settlement, and generates plain-English incident postmortems using Gemini 3.5 Flash with an integrated institutional memory feedback loop.
+The core thesis: **AI agents will hallucinate, get compromised, and recurse into runaway spending loops.** Wardstone is the circuit breaker that stops them.
 
 ---
 
-## 2. Multi-Agent Nexus Architecture
+## Google AI Models & Cloud Services Used
 
-Wardstone implements the **Multi-Agent Nexus** orchestration pattern using Google ADK with strictly enforced separation of concerns:
+### 🤖 AI Models
 
-```mermaid
-graph TD
-    subgraph "External Multi-Agent Ecosystem"
-        EXT["External Buyer Agent<br/>(Requests Micro-Service / Compute)"]
-        AC_EXT["A2A Pre-Clearance Query<br/>(Queries Gatekeeper Agent Card)"]
-    end
+| Model | Model ID | Role |
+|---|---|---|
+| **Gemma 4** | `gemma-4-26b-a4b-it` | Edge Pre-Screen Firewall — low-latency semantic filter blocking prompt injections and override payloads at the gatekeeper layer before they reach the risk engine |
+| **Gemini 3.5 Flash** | `gemini-3.5-flash` | Core Forensics Scribe — generates detailed Markdown causal postmortems for every quarantined incident, including root cause, remediation steps, and governance proof hash |
+| **Gemini 2.5 Flash Image** | `gemini-2.5-flash-image` | Blast-Radius Topology Map — generates the underlying tech-noir grid background art dynamically embedded into SVG forensic topology diagrams |
+| **Google Cloud Text-to-Speech** | `en-US-Journey-O` voice | Audible Incident Dispatch — streams real MP3 threat alerts from the backend to the dashboard frontend on every incident |
 
-    subgraph "Google Cloud Ingestion Layer"
-        PS["Cloud Pub/Sub: `mandate-events`<br/>(Intent & Cart & AP2 Payment Mandate)"]
-    end
+### ☁️ Google Cloud Services
 
-    subgraph "Wardstone Multi-Agent Governance Fleet (Google ADK)"
-        ORCH["Root Orchestrator<br/>(Supervises State Machine & Failure Recovery)"]
-        
-        WATCH["1. Watcher Agent<br/>(Normalizes Mandates & Firestore)"]
-        FORE["2. Forecaster Agent<br/>(Memory Bank History & Collusion Detection & 0-100 Blast Risk)"]
-        GATE["3. Gatekeeper Agent<br/>(Threshold Policy & A2A Agent Card)"]
-        FOREN["4. Forensics Agent (Gemini 3.5 Flash)<br/>(Causal Postmortem & Inst. Memory Scribe)"]
-        
-        MB[("Agent Engine Memory Bank<br/>Spend Baselines & Profiles")]
-    end
+| Service | Usage |
+|---|---|
+| **Cloud Run** | Hosts the FastAPI backend (`src/server.py`) — fully containerized, auto-scaling |
+| **Cloud Firestore** | Stores all `ForensicIncidentReport` and `AP2PaymentMandate` documents |
+| **Cloud Pub/Sub** | Event-driven mandate broadcasting to the monitoring fleet |
+| **Cloud Text-to-Speech API** | Streams MP3 audio alerts via the `/api/v1/tts` endpoint |
 
-    subgraph "Official Settlement Rail"
-        X402["Official AP2 Facilitator<br/>(EVM Sepolia Settlement)"]
-        TX[("Ethereum Sepolia Blockchain<br/>Live Verifiable Tx Hash")]
-        BLOCK["Circuit Breaker Quarantined<br/>(Zero Funds / No On-Chain Tx)"]
-    end
+### 🔧 Agent Framework
 
-    subgraph "Observability & Fleet Command Console"
-        OTEL["OpenTelemetry Distributed Traces"]
-        DASH["Wardstone Fleet Command Console<br/>(Next.js on Vercel)"]
-        INC[("Firestore `incidents` & `overrides`")]
-    end
+- **Google GenAI SDK** (`google-genai >= 1.0.0`) — used natively for all Gemma and Gemini model calls
 
-    EXT -->|"Emits Payment Mandate"| PS
-    EXT <-->|"Queries Pre-Clearance"| AC_EXT
-    AC_EXT <--> GATE
+---
 
-    PS --> WATCH
-    ORCH --> WATCH
-    ORCH --> FORE
-    ORCH --> GATE
-    ORCH --> FOREN
+## Architecture
 
-    WATCH --> FORE
-    FORE <--> MB
-    FORE -->|"Risk Score"| GATE
-
-    GATE -->|"Low Risk (Score under 60)"| X402
-    X402 --> TX
-    GATE -->|"High Risk (Score 60 or above)"| BLOCK
-    BLOCK --> FOREN
-    FOREN --> INC
-
-    ORCH --> OTEL
-    INC --> DASH
-    MB --> DASH
-    PS --> DASH
+```
+                    ┌─────────────────────────────────┐
+  AP2 Payment ────► │   Wardstone Gatekeeper (FastAPI) │
+  Mandate           │                                 │
+                    │  1. Gemma Pre-Screen (Edge)      │
+                    │  2. Risk Engine + Velocity EMA   │
+                    │  3. Circuit Breaker Decision      │
+                    │  4. Gemini Forensics Postmortem  │
+                    │  5. Gemini 2.5 Flash Image Map   │
+                    │  6. Cloud TTS Voice Alert        │
+                    │  7. Firestore + Pub/Sub          │
+                    └─────────────────────────────────┘
+                              │
+                    ┌─────────▼──────────┐
+                    │  Base Sepolia      │
+                    │  x402 Settlement   │
+                    │  (Chain ID 84532)  │
+                    └────────────────────┘
 ```
 
 ---
 
-## 3. Key Differentiators & Advanced Capabilities
+## Dashboard Features
 
-### A. Cross-Agent Collusion Detection
-Standard velocity checks fail when multiple "distinct" agents sybil-attack or smurf funds into a single destination. Our **Forecaster Agent** utilizes a destination burst tracker to detect multi-agent convergence, immediately flooring the risk score to quarantine the transactions.
-
-### B. Institutional Memory Feedback Loop
-When a mandate is quarantined, the **Forensics Agent** queries past human overrides (`FORCE_APPROVE` or `CONFIRM_BAN`) from Firestore. It natively injects this historical context into Gemini 3.5 Flash, allowing the LLM to learn from the Fleet Controller's past decisions when generating explanations for future anomalies.
-
-### C. Hash-Chained Proof of Governance
-To ensure that AI governance decisions are untampered, every forensic incident report generates a cryptographic SHA-256 hash that links back to the prior incident's hash. This creates a verifiable governance chain that auditors can recompute at any time to prove zero tampering.
-
-### D. Policy Simulation Engine
-Before modifying risk thresholds in production, Fleet Controllers can use the Wardstone dashboard's "Simulate Policy" feature. This engine backtests hypothetical thresholds (e.g., changing the trigger from 60 to 50) against historical mandates, showing the exact diff of how many additional transactions would have been caught or incorrectly blocked.
+| Section | Description |
+|---|---|
+| **Overview** | Executive control plane — circuit breaker status, settlement rail, live mandate stream |
+| **Mandate Stream** | Datadog-style incident commander — click any mandate to inspect, acknowledge, view postmortem |
+| **Blast-Radius Radar** | Predictive velocity wave charts + real-time risk ≥ 60 heatmap |
+| **Trace Waterfall** | OpenTelemetry span-level pipeline latency traces |
+| **Memory Bank** | Institutional memory — all past forensic postmortems queryable |
+| **Agent Onboarding** | Register new agent fleets with spend limits and behavioral baselines |
 
 ---
 
-## 4. Strict Separation of Concerns (4 Google ADK Agents)
+## Simulation Triggers
 
-| Agent | Core Responsibility | What It Does NOT Do |
-| :--- | :--- | :--- |
-| **1. Watcher Agent** | Subscribes to Pub/Sub events, parses AP2 schemas, normalizes records into Firestore. | Does *not* calculate risk scores, does *not* execute payments. |
-| **2. Forecaster Agent** | Queries **Agent Engine Memory Bank**, tracks destination bursts, calculates velocity variance & deviation, outputs 0-100 Blast Risk. | Does *not* make binary approve/deny policy decisions. |
-| **3. Gatekeeper Agent** | Applies threshold policy (`Score < 60`), authorizes on-chain EVM Sepolia settlement, or trips Circuit Breaker. Exposes **A2A Agent Card**. | Does *not* generate long-form forensic reports. |
-| **4. Forensics Agent** | Ingests quarantined mandates and prompts **Gemini 3.5 Flash** (with Institutional Memory context) to draft executive-ready incident postmortems. | Never touches money or settlement credentials. |
+Click any button in the top toolbar to inject a live payment mandate through the full pipeline:
 
----
-
-## 5. Failure-Tolerant Recovery (Multi-Agent Nexus Rubric)
-
-A key requirement of the hackathon's Multi-Agent Nexus architecture is failure recovery:
-* If a worker agent (such as the Forecaster) times out, encounters a network glitch, or returns malformed output, the **Root Orchestrator** catches the exception.
-* It performs exponential retries and engages safe **defensive fallback routing** (quarantining unverified high-value transactions defensively) without crashing the fleet or stalling downstream operations.
+- 🟢 **Normal ($2.50)** — clean autonomous documentation indexer, approved instantly
+- 🟡 **Batch ($25.00)** — medium-cost GPU compute, passes with low risk score
+- 🔴 **Rogue Runaway ($220.00)** — compromised scraper at 22x its declared limit → circuit breaker trips, Gemini generates postmortem, TTS alert fires
+- 🔄 **Inject Crash** — worker failure injection test
 
 ---
 
-## 6. Live Demo Scenarios & Testnet Disclosure
-
-> [!NOTE]
-> **Testnet Disclosure**: All on-chain settlement demonstrations execute strictly on **Ethereum Sepolia Testnet (Chain ID: 11155111)** using test-ETH micropayments. No real currency is transferred.
-
-The built-in Command Console includes triggers to demonstrate the entire lifecycle live:
-1. **Clean Micro-Settlement ($2.50)**: Normal steady indexer mandate -> Score: 20.0/100 -> Approved -> Settled on Ethereum Sepolia with verifiable transaction hash.
-2. **Batch Compute Mandate ($25.00)**: Nightly batch worker -> Score: 38.5/100 -> Approved -> Settled on Ethereum Sepolia.
-3. **Rogue Runaway Loop ($220.00)**: Compromised agent attempting recursive bursts -> Score: 99.0/100 -> **Circuit Breaker Quarantined (Zero On-Chain Movement)** -> Gemini 3.5 Flash generates incident postmortem in Firestore.
-4. **Failure Injection & Recovery**: Deliberately crashes the Forecaster mid-flight -> Orchestrator catches error, logs warning, engages defensive quarantine, and keeps the fleet fully operational.
-
----
-
-## 7. Quick Start & Reproducible Setup Guide
-
-### Prerequisites
-* Node.js 18+ (for frontend)
-* Python 3.12+ (for backend)
-* Google Cloud account with Gemini API key (optional for local deterministic fallback)
-* Ethereum Sepolia testnet RPC connection
-
-### Local Installation & Spin-Up
+## Running Locally
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/AmanM006/wardstone.git
-cd wardstone
-
-# 2. Start the Backend API (FastAPI)
-python -m venv venv
-source venv/bin/activate
+# Backend
 pip install -r requirements.txt
-cp .env.example .env
-uvicorn src.server:app --host 0.0.0.0 --port 8080
+cp .env.example .env  # add your GEMINI_API_KEY
+python -m uvicorn src.server:app --host 0.0.0.0 --port 8080
 
-# 3. Start the Frontend Dashboard (Next.js)
+# Frontend (separate terminal)
 cd frontend
 npm install
 npm run dev
+# Open http://localhost:3000/dashboard
 ```
-
-Open your browser at **`http://localhost:3000`** to view the live Command Console!
 
 ---
 
-## 8. Technology Stack Summary
+## Environment Variables
 
-* **Core AI Reasoning**: Google Gemini 3.5 Flash (via Google GenAI SDK)
-* **Edge Pre-Screening**: Semantic Gemini Firewall (Guardrails against prompt injection and jailbreaks)
-* **Agent Framework**: Google Agent Development Kit (ADK 2.7)
-* **Agent Protocol**: A2A (Agent-to-Agent v1.0) with JSON-LD Agent Cards & AP2 / on-chain micropayments
-* **Cloud Infrastructure**: Google Cloud Run, Google Cloud Firestore, Google Cloud Pub/Sub
-* **Blockchain Settlement**: Ethereum Sepolia Testnet (Chain ID: 11155111), Web3.py
-* **Frontend**: Next.js 16 + TypeScript, deployed to Vercel
-* **Backend**: FastAPI, Uvicorn (Python)
-* **Observability**: OpenTelemetry Distributed Tracing (OTLP)
+| Variable | Description |
+|---|---|
+| `GEMINI_API_KEY` | Google AI Studio API key (for Gemma + Gemini calls) |
+| `GOOGLE_CLOUD_PROJECT` | GCP project ID |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Path to service account JSON (for Firestore, Pub/Sub, TTS) |
+| `BASE_SEPOLIA_RPC_URL` | Base Sepolia RPC endpoint |
+| `SETTLEMENT_PRIVATE_KEY` | Wallet private key for test settlements |
+
+---
+
+## Tech Stack
+
+- **Backend**: Python 3.12, FastAPI, Uvicorn
+- **Frontend**: Next.js 16, TypeScript, Tailwind CSS, Recharts, Lenis
+- **Blockchain**: web3.py, Base Sepolia testnet (Chain ID 84532), x402 / EIP-4337
+- **Observability**: OpenTelemetry (traces, spans, latency metrics)
+- **AI**: Google GenAI SDK, Gemma 4, Gemini 3.5 Flash, Gemini 2.5 Flash Image
+- **Cloud**: Cloud Run, Firestore, Pub/Sub, Cloud TTS, Vertex AI

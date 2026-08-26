@@ -44,6 +44,7 @@ export default function DashboardPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loadingScenario, setLoadingScenario] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Selected items for Modals & Drawers
   const [selectedMandate, setSelectedMandate] = useState<AP2PaymentMandate | null>(null);
@@ -137,8 +138,22 @@ export default function DashboardPage() {
   const handleTriggerSimulation = async (scenario: string) => {
     try {
       setLoadingScenario(scenario);
-      await triggerSimulation(scenario);
+      const result = await triggerSimulation(scenario);
       await refreshAll();
+      // Show toast and navigate to mandates so user sees the new mandate
+      const isRogue = result.risk_score >= 60;
+      setToast({
+        type: isRogue ? 'error' : 'success',
+        message: isRogue
+          ? `🚨 Circuit Breaker TRIGGERED — ${result.buyer_agent} tried $${result.amount_usdc} USDC (Risk: ${result.risk_score}/100)`
+          : `✅ Mandate settled — ${result.buyer_agent}: $${result.amount_usdc} USDC (Risk: ${result.risk_score}/100)`,
+      });
+      setTimeout(() => setToast(null), 6000);
+      // Navigate to mandates tab so they see the new entry
+      handleNavigate('MANDATES', 'mandates');
+    } catch (err: any) {
+      setToast({ type: 'error', message: `Simulation failed: ${err.message}` });
+      setTimeout(() => setToast(null), 4000);
     } finally {
       setLoadingScenario(null);
     }
@@ -179,6 +194,17 @@ export default function DashboardPage() {
 
   return (
     <div className="h-screen w-screen bg-[#000000] text-[#ededed] flex overflow-hidden font-sans select-text">
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-[100] max-w-md px-4 py-3 rounded-xl border shadow-2xl text-sm font-medium flex items-start gap-3 animate-in slide-in-from-top-2 duration-300 ${
+          toast.type === 'success'
+            ? 'bg-[#0a1f0f] border-emerald-800 text-emerald-300'
+            : 'bg-[#1f0a0a] border-rose-800 text-rose-300'
+        }`}>
+          <span className="flex-1">{toast.message}</span>
+          <button onClick={() => setToast(null)} className="text-zinc-500 hover:text-white mt-0.5">✕</button>
+        </div>
+      )}
       {/* 1. Wardstone Left Sidebar */}
       <VercelSidebar
         activeTab={activeTab}
