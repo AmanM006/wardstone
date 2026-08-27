@@ -399,10 +399,10 @@ export const DatadogIncidentPanel: React.FC<DatadogIncidentPanelProps> = ({
                   </div>
                 )}
 
-                {proofHash && (
-                  <div className="p-3 bg-[#0a101a] border border-[#1a2b4c] rounded-lg text-sky-300 text-xs font-mono break-all">
+                {matchingIncident?.governance_hash && (
+                  <div className="p-3 bg-[#0a101a] border border-[#1a2b4c] rounded-lg text-sky-300 text-xs font-mono break-all mt-4">
                     <strong>[Proof of Governance]: </strong>
-                    {matchingIncident?.governance_hash || finalProofHash}
+                    {matchingIncident.governance_hash}
                   </div>
                 )}
 
