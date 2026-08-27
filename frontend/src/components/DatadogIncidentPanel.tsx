@@ -175,8 +175,8 @@ export const DatadogIncidentPanel: React.FC<DatadogIncidentPanelProps> = ({
   // Generate unique hash per mandate
   const mandateId = selectedMandate?.mandate_id || raw?.mandate_id;
   const proofHash = mandateId
-    ? Array.from(mandateId + (dec.tx_hash || '')).reduce(
-        (hash, ch) => ((hash << 5) - hash + ch.charCodeAt(0)) | 0, 0
+    ? (Array.from(mandateId + (dec.tx_hash || '')) as string[]).reduce(
+        (hash: number, ch: string) => ((hash << 5) - hash + ch.charCodeAt(0)) | 0, 0
       ).toString(16).padStart(64, '0')
     : '0'.repeat(64);
 
