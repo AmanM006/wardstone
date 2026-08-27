@@ -7,7 +7,7 @@
 
 ## What is Wardstone?
 
-Wardstone is a **real-time, zero-trust governance firewall** for autonomous AI agent payment fleets. As AI agents begin independently executing high-value financial transactions (via AP2 / x402 payment protocols on Base Sepolia), Wardstone intercepts, evaluates, and either approves or quarantines every mandate before any funds settle on-chain.
+Wardstone is a **real-time, zero-trust governance firewall** for autonomous AI agent payment fleets. As AI agents begin independently executing high-value financial transactions (via AP2 / x402 payment protocols on Ethereum Sepolia), Wardstone intercepts, evaluates, and either approves or quarantines every mandate before any funds settle on-chain.
 
 The core thesis: **AI agents will hallucinate, get compromised, and recurse into runaway spending loops.** Wardstone is the circuit breaker that stops them.
 
@@ -55,9 +55,9 @@ The core thesis: **AI agents will hallucinate, get compromised, and recurse into
                     └─────────────────────────────────┘
                               │
                     ┌─────────▼──────────┐
-                    │  Base Sepolia      │
+                    │  Ethereum Sepolia      │
                     │  x402 Settlement   │
-                    │  (Chain ID 84532)  │
+                    │  (Chain ID 11155111)  │
                     └────────────────────┘
 ```
 
@@ -111,7 +111,7 @@ npm run dev
 | `GEMINI_API_KEY` | Google AI Studio API key (for Gemma + Gemini calls) |
 | `GOOGLE_CLOUD_PROJECT` | GCP project ID |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Path to service account JSON (for Firestore, Pub/Sub, TTS) |
-| `BASE_SEPOLIA_RPC_URL` | Base Sepolia RPC endpoint |
+| `BASE_SEPOLIA_RPC_URL` | Ethereum Sepolia RPC endpoint |
 | `SETTLEMENT_PRIVATE_KEY` | Wallet private key for test settlements |
 
 ---
@@ -120,7 +120,7 @@ npm run dev
 
 - **Backend**: Python 3.12, FastAPI, Uvicorn
 - **Frontend**: Next.js 16, TypeScript, Tailwind CSS, Recharts, Lenis
-- **Blockchain**: web3.py, Base Sepolia testnet (Chain ID 84532), x402 / EIP-4337
+- **Blockchain**: web3.py, Ethereum Sepolia testnet (Chain ID 11155111), x402 / EIP-4337
 - **Observability**: OpenTelemetry (traces, spans, latency metrics)
 - **AI**: Google GenAI SDK, Gemma 4, Gemini 3.5 Flash, Gemini 2.5 Flash Image
 - **Cloud**: Cloud Run, Firestore, Pub/Sub, Cloud TTS, Vertex AI

@@ -172,13 +172,11 @@ export const DatadogIncidentPanel: React.FC<DatadogIncidentPanelProps> = ({
     setNewComment('');
   };
 
-  // Generate unique hash per mandate
-  const mandateId = selectedMandate?.mandate_id || raw?.mandate_id;
-  const proofHash = mandateId
-    ? (Array.from(mandateId + (dec.tx_hash || '')) as string[]).reduce(
-        (hash: number, ch: string) => ((hash << 5) - hash + ch.charCodeAt(0)) | 0, 0
-      ).toString(16).padStart(64, '0')
+  const mandateId = selectedMandate?.mandate_id || raw?.mandate_id || '';
+  const proofHash = mandateId 
+    ? Array.from(mandateId + (dec.tx_hash || '')).reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0).toString(16).replace('-', 'f') + Array.from((dec.tx_hash || '') + mandateId).reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0).toString(16).replace('-', 'a') + '0'.repeat(48)
     : '0'.repeat(64);
+  const finalProofHash = proofHash.slice(0, 64);
 
   const mandateCreatedAt = selectedMandate?.created_at as string | undefined;
   const incidentTimestamp = (matchingIncident as any)?.created_at || (matchingIncident as any)?.timestamp || mandateCreatedAt;
@@ -404,7 +402,7 @@ export const DatadogIncidentPanel: React.FC<DatadogIncidentPanelProps> = ({
                 {proofHash && (
                   <div className="p-3 bg-[#0a101a] border border-[#1a2b4c] rounded-lg text-sky-300 text-xs font-mono break-all">
                     <strong>[Proof of Governance]: </strong>
-                    {matchingIncident?.governance_hash || proofHash}
+                    {matchingIncident?.governance_hash || finalProofHash}
                   </div>
                 )}
 
