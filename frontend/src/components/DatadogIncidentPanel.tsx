@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Lenis from 'lenis';
 import { AP2PaymentMandate, ForensicIncidentReport } from '@/types';
 import { overrideIncident } from '@/lib/api';
-import { playCloudTTS } from '../lib/tts';
+import { playCloudTTS, stopCloudTTS } from '../lib/tts';
 import { CheckCircle2, Volume2, Network, Flame, Send, MessageSquare, ExternalLink, ShieldCheck, ShieldAlert, ChevronRight, Download, Play, X } from 'lucide-react';
 
 interface DatadogIncidentPanelProps {
@@ -157,12 +157,23 @@ export const DatadogIncidentPanel: React.FC<DatadogIncidentPanelProps> = ({
   const isHeld = selectedMandate?.status === 'HELD' || dec.status === 'HELD' || (risk.risk_score || 0) >= 60 || !!matchingIncident;
   const amount = Number(selectedMandate?.total_amount_usdc || raw?.total_amount_usdc || 0);
 
-  const handlePlayAudio = () => {
+  const [ttsState, setTtsState] = useState<'idle' | 'loading' | 'playing'>('idle');
+
+  const handlePlayAudio = async () => {
+    if (ttsState === 'playing' || ttsState === 'loading') {
+      stopCloudTTS();
+      setTtsState('idle');
+      return;
+    }
+
+    setTtsState('loading');
     const agentName = selectedMandate?.buyer_agent?.agent_name || raw?.buyer_agent?.agent_name || 'Unknown Agent';
     const text = matchingIncident
       ? `Alert: Wardstone Circuit Breaker has quarantined mandate from agent ${agentName}. Attempted spend: ${matchingIncident.attempted_amount_usdc} USDC. Risk score: ${matchingIncident.risk_score} out of 100. Base Sepolia settlement halted.`
       : `Wardstone confirmed mandate from agent ${agentName} for ${amount.toFixed(2)} USDC. Transaction settled on Base Sepolia.`;
-    playCloudTTS(text);
+    
+    // We modify playCloudTTS to let us know when it plays/ends
+    await playCloudTTS(text, () => setTtsState('playing'), () => setTtsState('idle'));
   };
 
   const handleAddComment = (e: React.FormEvent) => {
@@ -359,10 +370,30 @@ export const DatadogIncidentPanel: React.FC<DatadogIncidentPanelProps> = ({
               {selectedMandate && (
                 <button
                   onClick={handlePlayAudio}
-                  className="px-3 py-1.5 text-xs font-semibold bg-[#161616] hover:bg-[#202020] text-amber-300 border border-amber-900/40 rounded-lg transition flex items-center gap-1.5"
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${
+                    ttsState === 'playing'
+                      ? 'bg-amber-900/40 hover:bg-amber-900/60 text-amber-200 border border-amber-500/50'
+                      : ttsState === 'loading'
+                      ? 'bg-[#161616] text-amber-500/50 border border-amber-900/20 cursor-wait'
+                      : 'bg-[#161616] hover:bg-[#202020] text-amber-300 border border-amber-900/40'
+                  }`}
                 >
-                  <Volume2 className="w-3.5 h-3.5" />
-                  <span>Play TTS Voice Alert</span>
+                  {ttsState === 'playing' ? (
+                    <>
+                      <Volume2 className="w-3.5 h-3.5 animate-pulse" />
+                      <span>Stop TTS Audio</span>
+                    </>
+                  ) : ttsState === 'loading' ? (
+                    <>
+                      <span className="w-3.5 h-3.5 rounded-full border-2 border-amber-500/30 border-t-amber-500 animate-spin" />
+                      <span>Loading...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Volume2 className="w-3.5 h-3.5" />
+                      <span>Play TTS Voice Alert</span>
+                    </>
+                  )}
                 </button>
               )}
             </div>
