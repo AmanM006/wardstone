@@ -139,6 +139,9 @@ export default function DashboardPage() {
     try {
       setLoadingScenario(scenario);
       const result = await triggerSimulation(scenario);
+      if (result.success === false) {
+        throw new Error(result.error || 'Simulation blocked by circuit breaker.');
+      }
       await refreshAll();
       // Auto-select the newly created mandate so user sees it
       const newMandateId: string = result.mandate_id;
