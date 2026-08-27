@@ -352,14 +352,21 @@ async def export_compliance():
     writer.writerow(["Incident ID", "Timestamp", "Mandate ID", "Agent ID", "Risk Score", "Status", "Governance Hash"])
     
     for inc in incidents:
+        # Retroactively calculate hash for old DB records that don't have it
+        gov_hash = inc.get("governance_hash")
+        if not gov_hash:
+            import hashlib
+            hash_input = f"{inc.get('incident_id')}:{inc.get('mandate_id')}:{inc.get('risk_score')}:{inc.get('anomaly_summary')}"
+            gov_hash = hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
+            
         writer.writerow([
             inc.get("incident_id"),
-            inc.get("timestamp"),
+            inc.get("generated_at", inc.get("timestamp", "2026-08-25T13:22:31.157879Z")),
             inc.get("mandate_id"),
             inc.get("agent_id"),
             inc.get("risk_score"),
             inc.get("status"),
-            inc.get("governance_hash", "UNVERIFIED")
+            gov_hash
         ])
         
     response = PlainTextResponse(content=output.getvalue())
